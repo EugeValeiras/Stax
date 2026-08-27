@@ -7,6 +7,8 @@ enum Action: String, Codable {
     case focusColumnLeft    // foco a la ventana frontal de la columna de la izquierda
     case focusColumnRight   // foco a la ventana frontal de la columna de la derecha
     case moveToColumn       // mueve y redimensiona la ventana con foco a la columna `column` del atajo
+    case shareFocusedWindow // la ventana con foco pasa a ser la que refleja la ventana "Stax Share"
+    case stopSharing        // cierra la ventana "Stax Share"
 }
 
 enum ColumnSelection: String, Codable {
@@ -52,6 +54,7 @@ struct Config: Codable {
         Hotkey(key: "d", modifiers: [.control, .option], action: .moveToColumn, column: 1),
         Hotkey(key: "f", modifiers: [.control, .option], action: .moveToColumn, column: 2),
         Hotkey(key: "g", modifiers: [.control, .option], action: .moveToColumn, column: 3),
+        Hotkey(key: "s", modifiers: [.control, .option], action: .shareFocusedWindow),
     ]
 
     static let directory = FileManager.default.homeDirectoryForCurrentUser

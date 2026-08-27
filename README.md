@@ -48,6 +48,21 @@ Mueve y redimensiona la ventana con foco al primer, segundo o tercer tercio, den
 de menú ni Dock). Son los mismos atajos que usa Rectangle para los tercios, así que si sólo usabas Rectangle
 para eso, Stax lo reemplaza. Si lo dejás abierto con esos atajos, desactivalos ahí para que no se pisen.
 
+### Cambiar la ventana que compartís en una videollamada — ⌃⌥S
+
+Ninguna app de videollamada deja cambiar desde afuera la ventana que se comparte. Stax lo resuelve con una ventana
+propia, **Stax Share**, que refleja en vivo el contenido de la ventana que elijas (con ScreenCaptureKit, así que
+funciona aunque la ventana original quede tapada). En Meet, Zoom o Slack compartís *Stax Share* una sola vez y,
+desde ahí, cada vez que hacés foco en otra ventana y tocás ⌃⌥S, la videollamada pasa a mostrar esa.
+
+- El espejo aparece del tamaño de la ventana original (acotado a la pantalla) sin robarle el foco, y se acomoda
+  solo si la original cambia de tamaño. Podés moverlo o mandarlo a un tercio con ⌃⌥D/F/G como a cualquier ventana.
+- Su título es `Stax Share — App: título de la ventana`, para reconocerlo en el selector de la videollamada.
+- Si la ventana original se cierra, el espejo queda con un aviso; ⌃⌥S sobre otra lo retoma sin cortar la llamada.
+- *Dejar de compartir* en el menú ⫼ (o cerrar el espejo) termina la captura.
+
+Necesita el permiso de **Grabación de pantalla** (lo pide la primera vez que usás ⌃⌥S).
+
 ### Todos los atajos
 
 | Atajo | Acción | Qué hace |
@@ -59,6 +74,7 @@ para eso, Stax lo reemplaza. Si lo dejás abierto con esos atajos, desactivalos 
 | ⌃⌥D | `moveToColumn` 1 | Mueve la ventana con foco al primer tercio |
 | ⌃⌥F | `moveToColumn` 2 | Mueve la ventana con foco al tercio del medio |
 | ⌃⌥G | `moveToColumn` 3 | Mueve la ventana con foco al último tercio |
+| ⌃⌥S | `shareFocusedWindow` | La ventana con foco pasa a ser la que refleja *Stax Share* |
 
 ## El menú
 
@@ -66,10 +82,12 @@ para eso, Stax lo reemplaza. Si lo dejás abierto con esos atajos, desactivalos 
 
 Desde el ícono ⫼ de la barra de menú:
 
-- **Estado**: si tiene el permiso de Accesibilidad y si los atajos están activos, con la lista de atajos
-  configurados.
+- **Estado**: si tiene los permisos de Accesibilidad y Grabación de pantalla y si los atajos están activos, con la
+  lista de atajos configurados.
 - **Columna 1 / 2 / 3**: la pila de ventanas de cada columna (● la frontal, ○ las de atrás), con ▶ en la
-  columna activa. Elegí una ventana del submenú para traerla al frente, o *Mover la ventana con foco acá*.
+  columna activa. Elegí una ventana del submenú para traerla al frente (con ⌥ apretada, para compartirla), o
+  *Mover la ventana con foco acá*.
+- **Compartir la ventana con foco** / **Dejar de compartir**: lo mismo que ⌃⌥S, y qué se está compartiendo.
 - **Columnas**: 2, 3 o 4 columnas.
 - **Columna objetivo**: *Ventana con foco* (por defecto) o *Bajo el puntero*.
 - **Abrir config.json** / **Recargar config** (⌘R): para cambiar atajos y ajustes finos.
@@ -91,6 +109,8 @@ Desde el ícono ⫼ de la barra de menú:
 
 2. **Accesibilidad**: Ajustes → Privacidad y seguridad → Accesibilidad → agregar `Stax.app`.
    Hace falta tanto para interceptar los atajos como para reordenar ventanas.
+   **Grabación de pantalla**: sólo para compartir con ⌃⌥S; Stax lo pide la primera vez (relanzá la app después
+   de otorgarlo).
 
 3. Para que arranque al iniciar sesión: Ajustes → General → Ítems de inicio → agregar Stax.
 
@@ -109,7 +129,8 @@ Desde el ícono ⫼ de la barra de menú:
     { "key": "right", "modifiers": ["control", "command"], "action": "focusColumnRight" },
     { "key": "d", "modifiers": ["control", "option"], "action": "moveToColumn", "column": 1 },
     { "key": "f", "modifiers": ["control", "option"], "action": "moveToColumn", "column": 2 },
-    { "key": "g", "modifiers": ["control", "option"], "action": "moveToColumn", "column": 3 }
+    { "key": "g", "modifiers": ["control", "option"], "action": "moveToColumn", "column": 3 },
+    { "key": "s", "modifiers": ["control", "option"], "action": "shareFocusedWindow" }
   ],
   "raiseOnlyTargetWindow": true,
   "minimumWindowSize": 120,
@@ -123,7 +144,7 @@ Desde el ícono ⫼ de la barra de menú:
   siendo "`" y no "~".
 - `hotkeys[].modifiers`: combinación de `command`, `option`, `control`, `shift`.
 - `hotkeys[].action`: `cycleNext`, `cyclePrev`, `focusColumnLeft`, `focusColumnRight`, `moveToColumn`
-  (este último con `column`, 1-based).
+  (este último con `column`, 1-based), `shareFocusedWindow`, `stopSharing`.
 - `raiseOnlyTargetWindow`: usa la API privada de SkyLight (técnica de AltTab/yabai) para subir sólo esa
   ventana. En `false` usa Accessibility puro, que trae todas las ventanas de la app.
 - `verbose`: escribe cada atajo y acción en `~/Library/Logs/Stax.log`.
@@ -155,6 +176,9 @@ build/Stax.app/Contents/MacOS/Stax screenshot-menu docs/menu.png   # captura rea
   columnas; la ventana con foco se obtiene por Accessibility.
 - `Focus.swift`: `_SLPSSetFrontProcessWithOptions` + `SLPSPostEventRecordTo` + `AXRaise`, con fallback a
   `NSRunningApplication.activate` + `AXRaise`.
+- `Share.swift`: `SCStream` sobre una sola ventana (`SCContentFilter(desktopIndependentWindow:)`) dibujado en un
+  `AVSampleBufferDisplayLayer` dentro de la ventana *Stax Share*; cambiar de origen es `updateContentFilter`, sin
+  cortar la captura.
 
 ## Licencia
 

@@ -7,6 +7,7 @@ import ApplicationServices
 //   Stax list            → imprime las ventanas por columna y sale
 //   Stax do <acción> [N] → ejecuta cycleNext | cyclePrev | focusColumnLeft | focusColumnRight | moveToColumn
 //                                 (N = columna 1-based sobre la que actuar; por defecto, la de la ventana con foco)
+//                                 shareFocusedWindow y stopSharing sólo funcionan desde la app de barra de menú
 //   Stax screenshot-menu <png> → abre el menú de la barra, lo captura en <png> y sale (para la documentación)
 
 var arguments = Array(CommandLine.arguments.dropFirst())
@@ -44,6 +45,10 @@ case "list":
 case "do":
     guard arguments.count >= 2, let action = Action(rawValue: arguments[1]) else {
         print("Uso: Stax do cycleNext|cyclePrev|focusColumnLeft|focusColumnRight|moveToColumn [columna]")
+        exit(2)
+    }
+    if action == .shareFocusedWindow || action == .stopSharing {
+        print("\(action.rawValue) necesita la ventana Stax Share: usá el atajo o el menú ⫼ con la app corriendo")
         exit(2)
     }
     Log.verbose = true
