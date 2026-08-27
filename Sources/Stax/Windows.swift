@@ -35,6 +35,12 @@ enum Screens {
         framesCG.first { $0.contains(point) } ?? framesCG.first
     }
 
+    /// Área utilizable (sin barra de menú ni Dock) de la pantalla cuyo frame es `frame`, en CG.
+    static func visibleFrame(of frame: CGRect) -> CGRect {
+        let screen = NSScreen.screens.first { toCG($0.frame) == frame } ?? NSScreen.screens.first
+        return screen.map { toCG($0.visibleFrame) } ?? frame
+    }
+
     static var pointerCG: CGPoint { toCG(NSEvent.mouseLocation) }
 }
 
@@ -92,21 +98,28 @@ struct ColumnLayout {
         column(containing: window.center.x)
     }
 
+    /// Rectángulo de la columna dentro del área visible (sin barra de menú ni Dock).
     func frame(ofColumn index: Int) -> CGRect {
-        CGRect(x: screen.minX + CGFloat(index) * columnWidth, y: screen.minY, width: columnWidth, height: screen.height)
+        let visible = Screens.visibleFrame(of: screen)
+        let width = visible.width / CGFloat(max(columns, 1))
+        return CGRect(x: visible.minX + CGFloat(index) * width, y: visible.minY, width: width, height: visible.height)
     }
 }
 
 enum FocusedWindow {
-    /// Frame (en CG) de la ventana que tiene el foco del teclado, vía Accessibility.
-    static func frame() -> CGRect? {
+    /// Elemento AX de la ventana que tiene el foco del teclado.
+    static func element() -> AXUIElement? {
         guard let app = NSWorkspace.shared.frontmostApplication else { return nil }
         let appElement = AXUIElementCreateApplication(app.processIdentifier)
         var value: CFTypeRef?
         guard AXUIElementCopyAttributeValue(appElement, kAXFocusedWindowAttribute as CFString, &value) == .success,
               let value else { return nil }
-        let window = value as! AXUIElement
-        return AX.frame(of: window)
+        return (value as! AXUIElement)
+    }
+
+    /// Frame (en CG) de la ventana que tiene el foco del teclado, vía Accessibility.
+    static func frame() -> CGRect? {
+        element().flatMap { AX.frame(of: $0) }
     }
 }
 
@@ -122,6 +135,19 @@ enum AX {
         guard AXValueGetValue(posValue as! AXValue, .cgPoint, &position),
               AXValueGetValue(sizeValue as! AXValue, .cgSize, &size) else { return nil }
         return CGRect(origin: position, size: size)
+    }
+
+    /// Mueve y redimensiona una ventana. Se setea posición → tamaño → posición porque algunas apps
+    /// ajustan el tamaño mínimo y desplazan la ventana al cambiarlo.
+    @discardableResult
+    static func setFrame(_ frame: CGRect, of element: AXUIElement) -> Bool {
+        var position = frame.origin
+        var size = frame.size
+        guard let posValue = AXValueCreate(.cgPoint, &position), let sizeValue = AXValueCreate(.cgSize, &size) else { return false }
+        let a = AXUIElementSetAttributeValue(element, kAXPositionAttribute as CFString, posValue)
+        let b = AXUIElementSetAttributeValue(element, kAXSizeAttribute as CFString, sizeValue)
+        let c = AXUIElementSetAttributeValue(element, kAXPositionAttribute as CFString, posValue)
+        return a == .success && b == .success && c == .success
     }
 
     static func windows(ofApp pid: pid_t) -> [AXUIElement] {

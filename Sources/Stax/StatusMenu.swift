@@ -28,7 +28,7 @@ final class StatusMenu: NSObject, NSMenuDelegate {
         menu.addItem(disabled(AXIsProcessTrusted() ? "Accesibilidad: OK" : "Accesibilidad: falta permiso ⚠️"))
         menu.addItem(disabled(HotkeyManager.shared.isInstalled ? "Atajos: activos" : "Atajos: no instalados ⚠️"))
         for hotkey in config.hotkeys {
-            menu.addItem(disabled("   \(hotkey.description)  →  \(hotkey.action.rawValue)"))
+            menu.addItem(disabled("   \(hotkey.description)  →  \(hotkey.actionDescription)"))
         }
         menu.addItem(.separator())
 
@@ -48,6 +48,11 @@ final class StatusMenu: NSObject, NSMenuDelegate {
                         submenu.addItem(entry)
                     }
                 }
+                submenu.addItem(.separator())
+                let move = NSMenuItem(title: "Mover la ventana con foco acá", action: #selector(moveHere(_:)), keyEquivalent: "")
+                move.target = self
+                move.tag = index
+                submenu.addItem(move)
                 item.submenu = submenu
                 menu.addItem(item)
             }
@@ -124,6 +129,10 @@ final class StatusMenu: NSObject, NSMenuDelegate {
     @objc private func raiseWindow(_ sender: NSMenuItem) {
         guard let box = sender.representedObject as? WindowBox else { return }
         WindowFocuser.shared.raise(box.window, onlyThisWindow: controller.config.raiseOnlyTargetWindow)
+    }
+
+    @objc private func moveHere(_ sender: NSMenuItem) {
+        controller.perform(.moveToColumn, column: sender.tag)
     }
 
     @objc private func setColumns(_ sender: NSMenuItem) {

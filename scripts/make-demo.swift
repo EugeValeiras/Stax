@@ -6,7 +6,7 @@ import UniformTypeIdentifiers
 
 let W: CGFloat = 960, H: CGFloat = 400
 let FPS = 20.0
-let DURATION = 12.0
+let DURATION = 15.4
 
 // MARK: - Escena
 
@@ -14,75 +14,119 @@ struct Win {
     let title: String
     let tint: NSColor
     let lines: [CGFloat]   // anchos relativos de "líneas de contenido"
+    let column: Int        // columna inicial
 }
 
-let columns: [[Win]] = [
-    [Win(title: "Browser", tint: NSColor(calibratedRed: 0.35, green: 0.62, blue: 0.98, alpha: 1), lines: [0.9, 0.7, 0.8, 0.5]),
-     Win(title: "Notes", tint: NSColor(calibratedRed: 0.98, green: 0.80, blue: 0.35, alpha: 1), lines: [0.6, 0.8, 0.4])],
-    [Win(title: "Editor", tint: NSColor(calibratedRed: 0.55, green: 0.45, blue: 0.95, alpha: 1), lines: [0.5, 0.85, 0.7, 0.9, 0.6]),
-     Win(title: "Terminal", tint: NSColor(calibratedRed: 0.30, green: 0.85, blue: 0.60, alpha: 1), lines: [0.7, 0.4, 0.8, 0.3]),
-     Win(title: "Docs", tint: NSColor(calibratedRed: 0.98, green: 0.55, blue: 0.45, alpha: 1), lines: [0.8, 0.8, 0.6, 0.7])],
-    [Win(title: "Chat", tint: NSColor(calibratedRed: 0.40, green: 0.80, blue: 0.95, alpha: 1), lines: [0.5, 0.3, 0.6, 0.4, 0.5])],
+let windows: [Win] = [
+    Win(title: "Browser", tint: NSColor(calibratedRed: 0.35, green: 0.62, blue: 0.98, alpha: 1), lines: [0.9, 0.7, 0.8, 0.5], column: 0),
+    Win(title: "Notes", tint: NSColor(calibratedRed: 0.98, green: 0.80, blue: 0.35, alpha: 1), lines: [0.6, 0.8, 0.4], column: 0),
+    Win(title: "Editor", tint: NSColor(calibratedRed: 0.55, green: 0.45, blue: 0.95, alpha: 1), lines: [0.5, 0.85, 0.7, 0.9, 0.6], column: 1),
+    Win(title: "Terminal", tint: NSColor(calibratedRed: 0.30, green: 0.85, blue: 0.60, alpha: 1), lines: [0.7, 0.4, 0.8, 0.3], column: 1),
+    Win(title: "Docs", tint: NSColor(calibratedRed: 0.98, green: 0.55, blue: 0.45, alpha: 1), lines: [0.8, 0.8, 0.6, 0.7], column: 1),
+    Win(title: "Chat", tint: NSColor(calibratedRed: 0.40, green: 0.80, blue: 0.95, alpha: 1), lines: [0.5, 0.3, 0.6, 0.4, 0.5], column: 2),
 ]
 
-// Estado por columna: orden de la pila (índices en `columns[c]`, adelante → atrás).
+enum Kind {
+    case cycle          // ⌘`: la del fondo de la columna activa pasa al frente
+    case focus(Int)     // ⌃⌘←/→: el foco salta a otra columna
+    case move(Int)      // ⌃⌥D/F/G: la ventana frontal de la columna activa se muda a otra columna
+}
+
 struct Event {
     let time: Double
     let key: String
     let caption: String
-    let column: Int?        // columna a la que salta el foco (focusColumn*)
-    let cycle: Int?         // columna cuya pila cicla (cycleNext)
+    let kind: Kind
 }
 
 let events: [Event] = [
-    Event(time: 1.2, key: "⌘ `", caption: "⌘`  trae al frente la ventana del fondo del tercio activo", column: nil, cycle: 1),
-    Event(time: 2.7, key: "⌘ `", caption: "⌘`  otra vez: sigue ciclando la pila", column: nil, cycle: 1),
-    Event(time: 4.3, key: "⌃ ⌘ ←", caption: "⌃⌘←  salta el foco al tercio de la izquierda", column: 0, cycle: nil),
-    Event(time: 5.7, key: "⌘ `", caption: "⌘`  cada tercio tiene su propia pila", column: nil, cycle: 0),
-    Event(time: 7.2, key: "⌘ `", caption: "⌘`  y vuelve: el resto de la pantalla no se mueve", column: nil, cycle: 0),
-    Event(time: 8.8, key: "⌃ ⌘ →", caption: "⌃⌘→  de nuevo al centro", column: 1, cycle: nil),
-    Event(time: 10.2, key: "⌘ `", caption: "⌘`  como tener tres monitores en uno", column: nil, cycle: 1),
+    Event(time: 1.2, key: "⌘ `", caption: "⌘`  trae al frente la ventana del fondo del tercio activo", kind: .cycle),
+    Event(time: 2.7, key: "⌘ `", caption: "⌘`  otra vez: sigue ciclando la pila", kind: .cycle),
+    Event(time: 4.3, key: "⌃ ⌘ ←", caption: "⌃⌘←  salta el foco al tercio de la izquierda", kind: .focus(0)),
+    Event(time: 5.7, key: "⌘ `", caption: "⌘`  cada tercio tiene su propia pila", kind: .cycle),
+    Event(time: 7.2, key: "⌘ `", caption: "⌘`  y vuelve: el resto de la pantalla no se mueve", kind: .cycle),
+    Event(time: 8.8, key: "⌃ ⌘ →", caption: "⌃⌘→  de nuevo al centro", kind: .focus(1)),
+    Event(time: 10.2, key: "⌘ `", caption: "⌘`  como tener tres monitores en uno", kind: .cycle),
+    Event(time: 11.8, key: "⌃ ⌥ G", caption: "⌃⌥G  mueve la ventana al tercer tercio (⌃⌥D, ⌃⌥F, ⌃⌥G)", kind: .move(2)),
+    Event(time: 13.6, key: "⌃ ⌥ F", caption: "⌃⌥F  y de vuelta al medio. Chau, Rectangle.", kind: .move(1)),
 ]
 let transition = 0.45
+let moveTransition = 0.6
 
 func easeInOut(_ t: Double) -> Double {
     let x = min(max(t, 0), 1)
     return x < 0.5 ? 4 * x * x * x : 1 - pow(-2 * x + 2, 3) / 2
 }
 
-/// Devuelve, para el instante t, el orden de pila de cada columna y la profundidad animada de cada ventana.
-func state(at t: Double) -> (orders: [[Int]], depth: [[Double]], focus: Double, rising: [Int?], keyBadge: (String, Double)?, caption: String) {
-    var orders = columns.map { Array(0..<$0.count) }
-    var depth = columns.map { col in col.indices.map { Double($0) } }
+struct Moving {
+    let window: Int
+    let from: Int
+    let to: Int
+    let progress: Double
+}
+
+struct Scene {
+    var column: [Int]          // columna actual de cada ventana
+    var depth: [Double]        // profundidad animada (0 = frontal)
+    var focus: Double          // columna con foco (interpolada)
+    var rising: Int?           // ventana que está subiendo en un ⌘` (se dibuja última)
+    var moving: Moving?        // ventana en tránsito entre columnas
+    var keyBadge: (String, Double)?
+    var caption: String
+}
+
+func scene(at t: Double) -> Scene {
+    var orders: [[Int]] = (0..<3).map { c in windows.indices.filter { windows[$0].column == c } }
+    var column = windows.map(\.column)
+    var depth = windows.indices.map { Double(orders[windows[$0].column].firstIndex(of: $0)!) }
     var focus = 1.0
-    var rising: [Int?] = columns.map { _ in nil }
+    var rising: Int? = nil
+    var moving: Moving? = nil
     var badge: (String, Double)? = nil
     var caption = "Tres tercios, tres pilas de ventanas"
 
     for e in events where t >= e.time {
-        let p = easeInOut((t - e.time) / transition)
-        if p < 1 { badge = (e.key, 1 - (t - e.time) / 1.1) } else if t - e.time < 1.1 { badge = (e.key, 1 - (t - e.time) / 1.1) }
+        let elapsed = t - e.time
+        if elapsed < 1.1 { badge = (e.key, 1 - elapsed / 1.1) }
         caption = e.caption
-        if let c = e.column {
-            let from = focus
-            focus = from + (Double(c) - from) * p
-        }
-        if let c = e.cycle {
+        let activeColumn = Int(focus.rounded())
+
+        switch e.kind {
+        case .focus(let c):
+            let p = easeInOut(elapsed / transition)
+            focus += (Double(c) - focus) * p
+
+        case .cycle:
+            let p = easeInOut(elapsed / transition)
+            let c = activeColumn
             var order = orders[c]
             let last = order.removeLast()
             let newOrder = [last] + order
-            // profundidad interpolada: la del fondo sube a 0, el resto baja 1
-            var d = [Double](repeating: 0, count: columns[c].count)
-            for (newDepth, win) in newOrder.enumerated() {
-                let oldDepth = Double(orders[c].firstIndex(of: win)!)
-                d[win] = oldDepth + (Double(newDepth) - oldDepth) * p
+            for (newDepth, w) in newOrder.enumerated() {
+                let oldDepth = Double(orders[c].firstIndex(of: w)!)
+                depth[w] = oldDepth + (Double(newDepth) - oldDepth) * p
             }
-            depth[c] = d
-            if p < 1 { rising[c] = last } else { rising[c] = nil }
+            rising = p < 1 ? last : nil
             orders[c] = newOrder
+
+        case .move(let to):
+            let p = easeInOut(elapsed / moveTransition)
+            let from = activeColumn
+            let w = orders[from].removeFirst()
+            for (i, other) in orders[from].enumerated() {           // los de atrás suben un lugar
+                depth[other] = Double(i + 1) + (Double(i) - Double(i + 1)) * p
+            }
+            for (i, other) in orders[to].enumerated() {             // los del destino bajan un lugar
+                depth[other] = Double(i) + (Double(i + 1) - Double(i)) * p
+            }
+            orders[to].insert(w, at: 0)
+            depth[w] = 0
+            column[w] = p < 1 ? from : to
+            moving = p < 1 ? Moving(window: w, from: from, to: to, progress: p) : nil
+            focus += (Double(to) - focus) * p
         }
     }
-    return (orders, depth, focus, rising, badge, caption)
+    return Scene(column: column, depth: depth, focus: focus, rising: rising, moving: moving, keyBadge: badge, caption: caption)
 }
 
 // MARK: - Dibujo
@@ -103,7 +147,7 @@ func drawText(_ text: String, at point: CGPoint, size: CGFloat, weight: NSFont.W
 }
 
 func drawFrame(t: Double, ctx: CGContext) {
-    let s = state(at: t)
+    let s = scene(at: t)
 
     // Fondo
     let bg = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(),
@@ -159,20 +203,34 @@ func drawFrame(t: Double, ctx: CGContext) {
     ctx.restoreGState()
 
     // Ventanas por columna
+    func columnRect(_ c: Int) -> CGRect {
+        CGRect(x: screen.minX + colW * CGFloat(c), y: screen.minY, width: colW, height: screen.height).insetBy(dx: 18, dy: 22)
+    }
+    func windowRect(column c: Int, depth d: CGFloat) -> CGRect {
+        let colRect = columnRect(c)
+        let offset = d * 14
+        let scale = 1 - d * 0.04
+        return CGRect(x: colRect.minX + offset, y: colRect.minY + offset, width: colRect.width * scale, height: colRect.height * scale)
+    }
     for c in 0..<3 {
-        let colRect = CGRect(x: screen.minX + colW * CGFloat(c), y: screen.minY, width: colW, height: screen.height).insetBy(dx: 18, dy: 22)
-        let wins = columns[c]
-        // Dibujar de más profundo a más superficial; la que está subiendo se dibuja última.
-        var order = wins.indices.sorted { s.depth[c][$0] > s.depth[c][$1] }
-        if let r = s.rising[c] { order.removeAll { $0 == r }; order.append(r) }
-        for w in order {
-            let d = CGFloat(s.depth[c][w])
-            let offset = d * 14
-            let scale = 1 - d * 0.04
-            let base = CGRect(x: colRect.minX + offset, y: colRect.minY + offset,
-                              width: colRect.width * scale, height: colRect.height * scale)
-            drawWindow(wins[w], in: base, depth: s.rising[c] == w ? 0 : d, ctx: ctx)
+        var members = windows.indices.filter { s.column[$0] == c && s.moving?.window != $0 }
+        members.sort { s.depth[$0] > s.depth[$1] }
+        if let r = s.rising, let i = members.firstIndex(of: r) { members.remove(at: i); members.append(r) }
+        for w in members {
+            let d = CGFloat(s.depth[w])
+            drawWindow(windows[w], in: windowRect(column: c, depth: d), depth: s.rising == w ? 0 : d, ctx: ctx)
         }
+    }
+    // Ventana en tránsito: se dibuja encima de todo, interpolando entre columnas con un pequeño "salto".
+    if let m = s.moving {
+        let a = windowRect(column: m.from, depth: 0)
+        let b = windowRect(column: m.to, depth: 0)
+        let p = CGFloat(m.progress)
+        let lift = 1 + 0.05 * sin(Double(p) * .pi)
+        var r = CGRect(x: a.minX + (b.minX - a.minX) * p, y: a.minY + (b.minY - a.minY) * p,
+                       width: a.width + (b.width - a.width) * p, height: a.height + (b.height - a.height) * p)
+        r = r.insetBy(dx: -r.width * (lift - 1) / 2, dy: -r.height * (lift - 1) / 2)
+        drawWindow(windows[m.window], in: r, depth: 0, ctx: ctx)
     }
     ctx.restoreGState()
 

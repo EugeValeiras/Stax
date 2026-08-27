@@ -6,6 +6,12 @@ struct Hotkey: Codable, Equatable {
     var key: String              // un carácter ("`", "1") o un nombre: left, right, up, down, tab, space, escape, return, o "keycode:50"
     var modifiers: [Modifier]
     var action: Action
+    var column: Int? = nil       // 1-based; sólo para moveToColumn
+
+    var actionDescription: String {
+        if let column { return "\(action.rawValue) \(column)" }
+        return action.rawValue
+    }
 
     static let namedKeys: [String: Int64] = [
         "left": Int64(kVK_LeftArrow), "right": Int64(kVK_RightArrow),
@@ -46,6 +52,25 @@ struct Hotkey: Codable, Equatable {
             return keyCode == code
         }
         return baseCharacter.lowercased() == lower
+    }
+}
+
+/// Traduce un keycode al carácter que produce sin modificadores, según el layout de teclado actual.
+enum KeyTranslator {
+    static func baseCharacter(keyCode: UInt16) -> String {
+        guard let source = TISCopyCurrentKeyboardLayoutInputSource()?.takeRetainedValue(),
+              let layoutPointer = TISGetInputSourceProperty(source, kTISPropertyUnicodeKeyLayoutData) else { return "" }
+        let layoutData = Unmanaged<CFData>.fromOpaque(layoutPointer).takeUnretainedValue() as Data
+        return layoutData.withUnsafeBytes { raw -> String in
+            guard let layout = raw.bindMemory(to: UCKeyboardLayout.self).baseAddress else { return "" }
+            var deadKeyState: UInt32 = 0
+            var length = 0
+            var chars = [UniChar](repeating: 0, count: 4)
+            let status = UCKeyTranslate(layout, keyCode, UInt16(kUCKeyActionDisplay), 0, UInt32(LMGetKbdType()),
+                                        UInt32(kUCKeyTranslateNoDeadKeysMask), &deadKeyState, 4, &length, &chars)
+            guard status == noErr else { return "" }
+            return String(utf16CodeUnits: chars, count: length)
+        }
     }
 }
 
@@ -94,20 +119,13 @@ final class HotkeyManager {
         let keyCode = event.getIntegerValueField(.keyboardEventKeycode)
         let flags = event.flags
 
-        // Carácter base de la tecla (sin modificadores), para que ⌘⇧` siga siendo "`" y no "~".
-        var baseCharacter = ""
-        if let copy = event.copy() {
-            copy.flags = []
-            var length = 0
-            var buffer = [UniChar](repeating: 0, count: 4)
-            copy.keyboardGetUnicodeString(maxStringLength: 4, actualStringLength: &length, unicodeString: &buffer)
-            baseCharacter = String(utf16CodeUnits: buffer, count: length)
-        }
+        // Carácter base de la tecla (sin modificadores), para que ⌘⇧` siga siendo "`" y ⌃⌥F sea "f".
+        let baseCharacter = KeyTranslator.baseCharacter(keyCode: UInt16(keyCode))
 
         guard let hotkey = hotkeys.first(where: { $0.matches(keyCode: keyCode, baseCharacter: baseCharacter, flags: flags) }) else {
-            return false
+            return false   // no se loguean teclas ajenas a los atajos, ni en modo verbose
         }
-        Log.info("atajo \(hotkey.description) → \(hotkey.action.rawValue)")
+        Log.info("atajo \(hotkey.description) → \(hotkey.actionDescription)")
         DispatchQueue.main.async { self.onHotkey?(hotkey) }
         return true
     }

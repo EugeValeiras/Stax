@@ -45,12 +45,22 @@ final class Controller {
 
     // MARK: - Acciones
 
+    func perform(_ hotkey: Hotkey) {
+        perform(hotkey.action, column: hotkey.column.map { $0 - 1 })
+    }
+
     func perform(_ action: Action, column override: Int? = nil) {
         guard let target = target() else {
             Log.warn("no pude determinar la pantalla/columna objetivo")
             return
         }
         var column = override ?? target.column
+
+        if action == .moveToColumn {
+            moveFocusedWindow(to: column, in: target.layout)
+            return
+        }
+
         switch action {
         case .focusColumnLeft:
             guard column > 0 else { Log.info("ya estoy en la primera columna"); return }
@@ -86,6 +96,21 @@ final class Controller {
                     focuser.raise(window, onlyThisWindow: only)
                 }
             }
+
+        case .moveToColumn:
+            break // manejado arriba
         }
+    }
+
+    /// Mueve la ventana con foco a una columna (0-based) de la pantalla donde está.
+    func moveFocusedWindow(to column: Int, in layout: ColumnLayout) {
+        let column = min(max(column, 0), layout.columns - 1)
+        guard let window = FocusedWindow.element() else {
+            Log.warn("no hay ventana con foco para mover")
+            return
+        }
+        let frame = layout.frame(ofColumn: column)
+        let ok = AX.setFrame(frame, of: window)
+        Log.info("mover ventana con foco → columna \(column + 1): \(Int(frame.minX)),\(Int(frame.minY)) \(Int(frame.width))×\(Int(frame.height)) \(ok ? "OK" : "falló")")
     }
 }

@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <img src="docs/stax-demo.gif" width="960" alt="Demo de Stax: ⌘` cicla las ventanas del tercio activo y ⌃⌘→ salta el foco al tercio de al lado">
+  <img src="docs/stax-demo.gif" width="960" alt="Demo de Stax: ⌘` cicla las ventanas del tercio activo, ⌃⌘←/→ salta el foco de tercio y ⌃⌥D/F/G mueve la ventana a un tercio">
 </p>
 
 Stax es una app de barra de menú para macOS. Divide la pantalla en columnas (por defecto, tres tercios) y
@@ -33,9 +33,16 @@ app. Stax hace que el ciclo sea *por tercio*.
 | ⌘⇧` | `cyclePrev` | Manda la frontal al fondo (`[A,B,C] → [B,C,A]`) |
 | ⌃⌘← | `focusColumnLeft` | Foco a la ventana frontal de la columna de la izquierda |
 | ⌃⌘→ | `focusColumnRight` | Foco a la ventana frontal de la columna de la derecha |
+| ⌃⌥D | `moveToColumn` 1 | Mueve la ventana con foco al primer tercio |
+| ⌃⌥F | `moveToColumn` 2 | Mueve la ventana con foco al tercio del medio |
+| ⌃⌥G | `moveToColumn` 3 | Mueve la ventana con foco al último tercio |
 
 ⌘` reemplaza al atajo nativo de macOS (que sólo cicla las ventanas de la misma app).
 Sólo se sube la ventana objetivo: si una app tiene ventanas en dos columnas, las otras se quedan donde estaban.
+
+⌃⌥D/F/G son los mismos atajos que usa Rectangle para los tercios, así que si sólo usabas Rectangle para eso,
+Stax lo reemplaza. Las ventanas se acomodan dentro del área visible (sin barra de menú ni Dock). Si dejás
+Rectangle abierto con esos atajos, desactivalos ahí para que no se pisen.
 
 ## El menú
 
@@ -46,7 +53,7 @@ Desde el ícono ⫼ de la barra de menú:
 - **Estado**: si tiene el permiso de Accesibilidad y si los atajos están activos, con la lista de atajos
   configurados.
 - **Columna 1 / 2 / 3**: la pila de ventanas de cada columna (● la frontal, ○ las de atrás), con ▶ en la
-  columna activa. Elegí una ventana del submenú para traerla al frente.
+  columna activa. Elegí una ventana del submenú para traerla al frente, o *Mover la ventana con foco acá*.
 - **Columnas**: 2, 3 o 4 columnas.
 - **Columna objetivo**: *Ventana con foco* (por defecto) o *Bajo el puntero*.
 - **Abrir config.json** / **Recargar config** (⌘R): para cambiar atajos y ajustes finos.
@@ -83,7 +90,10 @@ Desde el ícono ⫼ de la barra de menú:
     { "key": "`", "modifiers": ["command"], "action": "cycleNext" },
     { "key": "`", "modifiers": ["command", "shift"], "action": "cyclePrev" },
     { "key": "left", "modifiers": ["control", "command"], "action": "focusColumnLeft" },
-    { "key": "right", "modifiers": ["control", "command"], "action": "focusColumnRight" }
+    { "key": "right", "modifiers": ["control", "command"], "action": "focusColumnRight" },
+    { "key": "d", "modifiers": ["control", "option"], "action": "moveToColumn", "column": 1 },
+    { "key": "f", "modifiers": ["control", "option"], "action": "moveToColumn", "column": 2 },
+    { "key": "g", "modifiers": ["control", "option"], "action": "moveToColumn", "column": 3 }
   ],
   "raiseOnlyTargetWindow": true,
   "minimumWindowSize": 120,
@@ -96,7 +106,8 @@ Desde el ícono ⫼ de la barra de menú:
   `escape`, `return`, `delete`) o `"keycode:50"`. Los caracteres se comparan sin modificadores, así ⌘⇧` sigue
   siendo "`" y no "~".
 - `hotkeys[].modifiers`: combinación de `command`, `option`, `control`, `shift`.
-- `hotkeys[].action`: `cycleNext`, `cyclePrev`, `focusColumnLeft`, `focusColumnRight`.
+- `hotkeys[].action`: `cycleNext`, `cyclePrev`, `focusColumnLeft`, `focusColumnRight`, `moveToColumn`
+  (este último con `column`, 1-based).
 - `raiseOnlyTargetWindow`: usa la API privada de SkyLight (técnica de AltTab/yabai) para subir sólo esa
   ventana. En `false` usa Accessibility puro, que trae todas las ventanas de la app.
 - `verbose`: escribe cada atajo y acción en `~/Library/Logs/Stax.log`.
@@ -106,6 +117,7 @@ Desde el ícono ⫼ de la barra de menú:
 ```bash
 .build/debug/Stax list              # ventanas por columna (▶ = columna activa)
 .build/debug/Stax do cycleNext 2    # ejecuta una acción sobre la columna 2
+.build/debug/Stax do moveToColumn 3 # mueve la ventana con foco al tercer tercio
 tail -f ~/Library/Logs/Stax.log     # con "verbose": true
 ```
 

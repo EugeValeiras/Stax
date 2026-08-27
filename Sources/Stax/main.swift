@@ -5,7 +5,7 @@ import ApplicationServices
 //   Stax                 → app de barra de menú con los atajos globales
 //   Stax --verbose       → ídem, logueando atajos y acciones a stderr
 //   Stax list            → imprime las ventanas por columna y sale
-//   Stax do <acción> [N] → ejecuta cycleNext | cyclePrev | focusColumnLeft | focusColumnRight
+//   Stax do <acción> [N] → ejecuta cycleNext | cyclePrev | focusColumnLeft | focusColumnRight | moveToColumn
 //                                 (N = columna 1-based sobre la que actuar; por defecto, la de la ventana con foco)
 //   Stax screenshot-menu <png> → abre el menú de la barra, lo captura en <png> y sale (para la documentación)
 
@@ -43,7 +43,7 @@ case "list":
 
 case "do":
     guard arguments.count >= 2, let action = Action(rawValue: arguments[1]) else {
-        print("Uso: Stax do cycleNext|cyclePrev|focusColumnLeft|focusColumnRight [columna]")
+        print("Uso: Stax do cycleNext|cyclePrev|focusColumnLeft|focusColumnRight|moveToColumn [columna]")
         exit(2)
     }
     Log.verbose = true
@@ -98,7 +98,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func installHotkeys() {
         let manager = HotkeyManager.shared
         manager.hotkeys = controller.config.hotkeys
-        manager.onHotkey = { hotkey in controller.perform(hotkey.action) }
+        manager.onHotkey = { hotkey in controller.perform(hotkey) }
         if !manager.hotkeys.isEmpty { _ = manager.install() }
     }
 

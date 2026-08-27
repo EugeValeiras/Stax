@@ -6,6 +6,7 @@ enum Action: String, Codable {
     case cyclePrev          // trae al frente la que está justo detrás y manda la frontal al fondo
     case focusColumnLeft    // foco a la ventana frontal de la columna de la izquierda
     case focusColumnRight   // foco a la ventana frontal de la columna de la derecha
+    case moveToColumn       // mueve y redimensiona la ventana con foco a la columna `column` del atajo
 }
 
 enum ColumnSelection: String, Codable {
@@ -48,6 +49,9 @@ struct Config: Codable {
         Hotkey(key: "`", modifiers: [.command, .shift], action: .cyclePrev),
         Hotkey(key: "left", modifiers: [.control, .command], action: .focusColumnLeft),
         Hotkey(key: "right", modifiers: [.control, .command], action: .focusColumnRight),
+        Hotkey(key: "d", modifiers: [.control, .option], action: .moveToColumn, column: 1),
+        Hotkey(key: "f", modifiers: [.control, .option], action: .moveToColumn, column: 2),
+        Hotkey(key: "g", modifiers: [.control, .option], action: .moveToColumn, column: 3),
     ]
 
     static let directory = FileManager.default.homeDirectoryForCurrentUser
