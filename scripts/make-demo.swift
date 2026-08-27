@@ -1,12 +1,12 @@
-// Genera docs/stax-demo.gif: animación ilustrativa de Stax (dibujada con CoreGraphics, sin grabar pantalla).
-// Uso: swift scripts/make-demo.swift
+// Genera las animaciones de docs/ (dibujadas con CoreGraphics, sin grabar pantalla).
+// Uso: swift scripts/make-demo.swift [cycle|focus|move ...]   (sin argumentos genera las tres)
+//      STAX_DEMO_STILLS="1.4,3.0" swift scripts/make-demo.swift cycle   → exporta frames PNG a /tmp para revisar
 import AppKit
 import ImageIO
 import UniformTypeIdentifiers
 
 let W: CGFloat = 960, H: CGFloat = 400
 let FPS = 20.0
-let DURATION = 15.4
 
 // MARK: - Escena
 
@@ -39,17 +39,36 @@ struct Event {
     let kind: Kind
 }
 
-let events: [Event] = [
-    Event(time: 1.2, key: "⌘ `", caption: "⌘`  trae al frente la ventana del fondo del tercio activo", kind: .cycle),
-    Event(time: 2.7, key: "⌘ `", caption: "⌘`  otra vez: sigue ciclando la pila", kind: .cycle),
-    Event(time: 4.3, key: "⌃ ⌘ ←", caption: "⌃⌘←  salta el foco al tercio de la izquierda", kind: .focus(0)),
-    Event(time: 5.7, key: "⌘ `", caption: "⌘`  cada tercio tiene su propia pila", kind: .cycle),
-    Event(time: 7.2, key: "⌘ `", caption: "⌘`  y vuelve: el resto de la pantalla no se mueve", kind: .cycle),
-    Event(time: 8.8, key: "⌃ ⌘ →", caption: "⌃⌘→  de nuevo al centro", kind: .focus(1)),
-    Event(time: 10.2, key: "⌘ `", caption: "⌘`  como tener tres monitores en uno", kind: .cycle),
-    Event(time: 11.8, key: "⌃ ⌥ G", caption: "⌃⌥G  mueve la ventana al tercer tercio (⌃⌥D, ⌃⌥F, ⌃⌥G)", kind: .move(2)),
-    Event(time: 13.6, key: "⌃ ⌥ F", caption: "⌃⌥F  y de vuelta al medio. Chau, Rectangle.", kind: .move(1)),
+struct Demo {
+    let name: String
+    let subtitle: String
+    let idleCaption: String
+    let duration: Double
+    let events: [Event]
+}
+
+let demos: [Demo] = [
+    Demo(name: "cycle", subtitle: "cambiá de ventana dentro del tercio activo", idleCaption: "Tres ventanas apiladas en el tercio del medio", duration: 5.6, events: [
+        Event(time: 1.0, key: "⌘ `", caption: "⌘`  trae al frente la ventana del fondo de la pila", kind: .cycle),
+        Event(time: 2.5, key: "⌘ `", caption: "⌘`  otra vez: sigue ciclando", kind: .cycle),
+        Event(time: 4.0, key: "⌘ `", caption: "⌘`  sólo se mueve el tercio activo; ⌘⇧` va al revés", kind: .cycle),
+    ]),
+    Demo(name: "focus", subtitle: "saltá de tercio como si fuera otro monitor", idleCaption: "El foco está en el tercio del medio", duration: 6.6, events: [
+        Event(time: 1.0, key: "⌃ ⌘ ←", caption: "⌃⌘←  salta el foco al tercio de la izquierda", kind: .focus(0)),
+        Event(time: 2.4, key: "⌘ `", caption: "⌘`  cicla la pila de ese tercio", kind: .cycle),
+        Event(time: 3.8, key: "⌘ `", caption: "⌘`  el resto de la pantalla no se mueve", kind: .cycle),
+        Event(time: 5.2, key: "⌃ ⌘ →", caption: "⌃⌘→  y vuelve al centro", kind: .focus(1)),
+    ]),
+    Demo(name: "move", subtitle: "acomodá la ventana en un tercio", idleCaption: "La ventana con foco es Editor, en el medio", duration: 6.6, events: [
+        Event(time: 1.0, key: "⌃ ⌥ G", caption: "⌃⌥G  la lleva al tercer tercio", kind: .move(2)),
+        Event(time: 2.8, key: "⌃ ⌥ D", caption: "⌃⌥D  al primero", kind: .move(0)),
+        Event(time: 4.6, key: "⌃ ⌥ F", caption: "⌃⌥F  y al medio. Chau, Rectangle.", kind: .move(1)),
+    ]),
 ]
+
+var demo = demos[0]
+var events: [Event] { demo.events }
+
 let transition = 0.45
 let moveTransition = 0.6
 
@@ -83,7 +102,7 @@ func scene(at t: Double) -> Scene {
     var rising: Int? = nil
     var moving: Moving? = nil
     var badge: (String, Double)? = nil
-    var caption = "Tres tercios, tres pilas de ventanas"
+    var caption = demo.idleCaption
 
     for e in events where t >= e.time {
         let elapsed = t - e.time
@@ -158,7 +177,7 @@ func drawFrame(t: Double, ctx: CGContext) {
 
     // Título
     drawText("Stax", at: CGPoint(x: 40, y: H - 52), size: 26, weight: .bold, color: .white)
-    drawText("cambiá de ventana por tercios en tu ultrawide", at: CGPoint(x: 112, y: H - 47), size: 15, weight: .regular, color: NSColor.white.withAlphaComponent(0.6))
+    drawText(demo.subtitle, at: CGPoint(x: 112, y: H - 47), size: 15, weight: .regular, color: NSColor.white.withAlphaComponent(0.6))
 
     // Monitor
     let mon = CGRect(x: 40, y: 92, width: W - 80, height: 248)
@@ -312,21 +331,25 @@ func renderFrame(t: Double) -> CGImage {
     return rep.cgImage!
 }
 
-let frameCount = Int(DURATION * FPS)
-let url = URL(fileURLWithPath: "docs/stax-demo.gif")
-let dest = CGImageDestinationCreateWithURL(url as CFURL, UTType.gif.identifier as CFString, frameCount, nil)!
-CGImageDestinationSetProperties(dest, [kCGImagePropertyGIFDictionary: [kCGImagePropertyGIFLoopCount: 0]] as CFDictionary)
-for i in 0..<frameCount {
-    let t = Double(i) / FPS
-    let frameProps = [kCGImagePropertyGIFDictionary: [kCGImagePropertyGIFDelayTime: 1.0 / FPS]] as CFDictionary
-    CGImageDestinationAddImage(dest, renderFrame(t: t), frameProps)
-}
-CGImageDestinationFinalize(dest)
+let requested = Array(CommandLine.arguments.dropFirst())
+let selected = requested.isEmpty ? demos : demos.filter { requested.contains($0.name) }
+let stills = (ProcessInfo.processInfo.environment["STAX_DEMO_STILLS"] ?? "").split(separator: ",").compactMap { Double($0) }
 
-if CommandLine.arguments.count > 1 {
-    for (i, arg) in CommandLine.arguments.dropFirst().enumerated() {
-        let rep = NSBitmapImageRep(cgImage: renderFrame(t: Double(arg)!))
-        try! rep.representation(using: .png, properties: [:])!.write(to: URL(fileURLWithPath: "/private/tmp/claude-501/-Users-eugeniovaleiras-workspace-macos/37e6ab6f-e3e1-45a3-8070-c63044cf10a3/scratchpad/frame-\(i).png"))
+for d in selected {
+    demo = d
+    let frameCount = Int(d.duration * FPS)
+    let url = URL(fileURLWithPath: "docs/demo-\(d.name).gif")
+    let dest = CGImageDestinationCreateWithURL(url as CFURL, UTType.gif.identifier as CFString, frameCount, nil)!
+    CGImageDestinationSetProperties(dest, [kCGImagePropertyGIFDictionary: [kCGImagePropertyGIFLoopCount: 0]] as CFDictionary)
+    for i in 0..<frameCount {
+        let t = Double(i) / FPS
+        let frameProps = [kCGImagePropertyGIFDictionary: [kCGImagePropertyGIFDelayTime: 1.0 / FPS]] as CFDictionary
+        CGImageDestinationAddImage(dest, renderFrame(t: t), frameProps)
     }
+    CGImageDestinationFinalize(dest)
+    for (i, t) in stills.enumerated() {
+        let rep = NSBitmapImageRep(cgImage: renderFrame(t: t))
+        try! rep.representation(using: .png, properties: [:])!.write(to: URL(fileURLWithPath: "/tmp/stax-\(d.name)-\(i).png"))
+    }
+    print("docs/demo-\(d.name).gif: \(frameCount) frames")
 }
-print("docs/stax-demo.gif: \(frameCount) frames")

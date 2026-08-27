@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <img src="docs/stax-demo.gif" width="960" alt="Demo de Stax: ⌘` cicla las ventanas del tercio activo, ⌃⌘←/→ salta el foco de tercio y ⌃⌥D/F/G mueve la ventana a un tercio">
+  <img src="docs/demo-cycle.gif" width="960" alt="⌘` cicla las ventanas apiladas en el tercio activo">
 </p>
 
 Stax es una app de barra de menú para macOS. Divide la pantalla en columnas (por defecto, tres tercios) y
@@ -27,22 +27,38 @@ app. Stax hace que el ciclo sea *por tercio*.
 - La **columna activa** es la de la ventana que tiene el foco (configurable: también puede ser la que está bajo
   el puntero).
 
+### Ciclar el tercio activo — ⌘` y ⌘⇧`
+
+⌘` trae al frente la ventana del fondo de la pila (`[A,B,C] → [C,A,B]`); ⌘⇧` va al revés. Reemplaza al ⌘`
+nativo de macOS, que sólo cicla las ventanas de la misma app. Sólo se sube la ventana objetivo: si una app tiene
+ventanas en dos columnas, las otras se quedan donde estaban.
+
+### Saltar de tercio — ⌃⌘← y ⌃⌘→
+
+<img src="docs/demo-focus.gif" width="960" alt="⌃⌘← salta el foco al tercio de la izquierda; ⌘` cicla ahí sin mover el resto">
+
+El foco pasa a la ventana frontal del tercio de al lado, como si cambiaras de monitor. Cada tercio tiene su
+propia pila: ciclar uno no toca los otros.
+
+### Acomodar la ventana en un tercio — ⌃⌥D, ⌃⌥F y ⌃⌥G
+
+<img src="docs/demo-move.gif" width="960" alt="⌃⌥G, ⌃⌥D y ⌃⌥F mueven la ventana con foco al tercer, primer y segundo tercio">
+
+Mueve y redimensiona la ventana con foco al primer, segundo o tercer tercio, dentro del área visible (sin barra
+de menú ni Dock). Son los mismos atajos que usa Rectangle para los tercios, así que si sólo usabas Rectangle
+para eso, Stax lo reemplaza. Si lo dejás abierto con esos atajos, desactivalos ahí para que no se pisen.
+
+### Todos los atajos
+
 | Atajo | Acción | Qué hace |
 |---|---|---|
-| ⌘` | `cycleNext` | Trae al frente la ventana del fondo de la pila de la columna activa (`[A,B,C] → [C,A,B]`) |
-| ⌘⇧` | `cyclePrev` | Manda la frontal al fondo (`[A,B,C] → [B,C,A]`) |
+| ⌘` | `cycleNext` | Trae al frente la ventana del fondo de la pila de la columna activa |
+| ⌘⇧` | `cyclePrev` | Manda la frontal al fondo |
 | ⌃⌘← | `focusColumnLeft` | Foco a la ventana frontal de la columna de la izquierda |
 | ⌃⌘→ | `focusColumnRight` | Foco a la ventana frontal de la columna de la derecha |
 | ⌃⌥D | `moveToColumn` 1 | Mueve la ventana con foco al primer tercio |
 | ⌃⌥F | `moveToColumn` 2 | Mueve la ventana con foco al tercio del medio |
 | ⌃⌥G | `moveToColumn` 3 | Mueve la ventana con foco al último tercio |
-
-⌘` reemplaza al atajo nativo de macOS (que sólo cicla las ventanas de la misma app).
-Sólo se sube la ventana objetivo: si una app tiene ventanas en dos columnas, las otras se quedan donde estaban.
-
-⌃⌥D/F/G son los mismos atajos que usa Rectangle para los tercios, así que si sólo usabas Rectangle para eso,
-Stax lo reemplaza. Las ventanas se acomodan dentro del área visible (sin barra de menú ni Dock). Si dejás
-Rectangle abierto con esos atajos, desactivalos ahí para que no se pisen.
 
 ## El menú
 
@@ -127,7 +143,7 @@ Todo lo visual se genera por código, sin assets externos:
 
 ```bash
 swift scripts/make-icon.swift && iconutil -c icns Resources/AppIcon.iconset -o Resources/AppIcon.icns
-swift scripts/make-demo.swift                             # docs/stax-demo.gif
+swift scripts/make-demo.swift                             # docs/demo-{cycle,focus,move}.gif
 build/Stax.app/Contents/MacOS/Stax screenshot-menu docs/menu.png   # captura real del menú
 ```
 
