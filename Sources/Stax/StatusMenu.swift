@@ -27,6 +27,7 @@ final class StatusMenu: NSObject, NSMenuDelegate {
 
         menu.addItem(disabled(AXIsProcessTrusted() ? "Accesibilidad: OK" : "Accesibilidad: falta permiso ⚠️"))
         menu.addItem(disabled(HotkeyManager.shared.isInstalled ? "Atajos: activos" : "Atajos: no instalados ⚠️"))
+        menu.addItem(disabled(ShareMirror.hasPermission ? "Grabación de pantalla: OK" : "Grabación de pantalla: falta permiso (para compartir) ⚠️"))
         for hotkey in config.hotkeys {
             menu.addItem(disabled("   \(hotkey.description)  →  \(hotkey.actionDescription)"))
         }
@@ -46,6 +47,13 @@ final class StatusMenu: NSObject, NSMenuDelegate {
                         entry.target = self
                         entry.representedObject = WindowBox(window)
                         submenu.addItem(entry)
+                        // Con ⌥ apretada, la misma entrada comparte esa ventana en vez de traerla al frente.
+                        let share = NSMenuItem(title: "Compartir \(window.ownerName)", action: #selector(shareWindow(_:)), keyEquivalent: "")
+                        share.target = self
+                        share.representedObject = WindowBox(window)
+                        share.keyEquivalentModifierMask = [.option]
+                        share.isAlternate = true
+                        submenu.addItem(share)
                     }
                 }
                 submenu.addItem(.separator())
@@ -82,6 +90,17 @@ final class StatusMenu: NSObject, NSMenuDelegate {
         }
         modeItem.submenu = modeMenu
         menu.addItem(modeItem)
+
+        menu.addItem(.separator())
+        let shareItem = NSMenuItem(title: "Compartir la ventana con foco", action: #selector(shareFocused), keyEquivalent: "")
+        shareItem.target = self
+        menu.addItem(shareItem)
+        if let source = ShareMirror.shared.source {
+            let title = source.title.map { ": \($0)" } ?? ""
+            menu.addItem(disabled("   Compartiendo \(source.ownerName)\(title)"))
+            menu.addItem(withTitle: "Dejar de compartir", action: #selector(stopSharing), keyEquivalent: "").target = self
+        }
+        menu.addItem(.separator())
 
         menu.addItem(withTitle: "Abrir config.json", action: #selector(openConfig), keyEquivalent: "").target = self
         menu.addItem(withTitle: "Recargar config", action: #selector(reload), keyEquivalent: "r").target = self
@@ -134,6 +153,18 @@ final class StatusMenu: NSObject, NSMenuDelegate {
     @objc private func moveHere(_ sender: NSMenuItem) {
         controller.perform(.moveToColumn, column: sender.tag)
     }
+
+    @objc private func shareWindow(_ sender: NSMenuItem) {
+        guard let box = sender.representedObject as? WindowBox else { return }
+        ShareMirror.shared.share(box.window)
+    }
+
+    @objc private func shareFocused() {
+        // El menú ya se cerró y el foco volvió a la app de antes cuando corre esta acción.
+        controller.perform(.shareFocusedWindow)
+    }
+
+    @objc private func stopSharing() { controller.perform(.stopSharing) }
 
     @objc private func setColumns(_ sender: NSMenuItem) {
         controller.config.columns = sender.tag

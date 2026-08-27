@@ -8,6 +8,7 @@ struct WindowInfo {
     let pid: pid_t
     let ownerName: String
     let bounds: CGRect
+    var title: String? = nil   // sólo con permiso de Grabación de pantalla
 
     var center: CGPoint { CGPoint(x: bounds.midX, y: bounds.midY) }
 }
@@ -42,6 +43,12 @@ enum Screens {
     }
 
     static var pointerCG: CGPoint { toCG(NSEvent.mouseLocation) }
+
+    /// Factor de escala (px por pt) de la pantalla que contiene un punto CG.
+    static func backingScale(atCG point: CGPoint) -> CGFloat {
+        let screen = NSScreen.screens.first { toCG($0.frame).contains(point) } ?? NSScreen.main
+        return screen?.backingScaleFactor ?? 2
+    }
 }
 
 enum WindowLister {
@@ -77,7 +84,8 @@ enum WindowLister {
             guard isRegularApp(pid) else { continue }
 
             let owner = entry[kCGWindowOwnerName as String] as? String ?? "pid \(pid)"
-            result.append(WindowInfo(id: id, pid: pid, ownerName: owner, bounds: bounds))
+            let title = entry[kCGWindowName as String] as? String
+            result.append(WindowInfo(id: id, pid: pid, ownerName: owner, bounds: bounds, title: title))
         }
         return result
     }
@@ -120,6 +128,29 @@ enum FocusedWindow {
     /// Frame (en CG) de la ventana que tiene el foco del teclado, vía Accessibility.
     static func frame() -> CGRect? {
         element().flatMap { AX.frame(of: $0) }
+    }
+
+    /// La ventana con foco como `WindowInfo` (con su id de CoreGraphics). Cruza el elemento AX con la lista de
+    /// ventanas visibles por id o, si no, por frame; si tiene id pero no está en pantalla (otro escritorio),
+    /// la devuelve igual a partir del frame AX.
+    static func info(minimumSize: Double) -> WindowInfo? {
+        guard let app = NSWorkspace.shared.frontmostApplication else { Log.info("no hay app frontal"); return nil }
+        guard let element = element() else { Log.info("\(app.localizedName ?? "?") no tiene ventana con foco (AX)"); return nil }
+        let pid = app.processIdentifier
+        let candidates = WindowLister.onScreenWindows(minimumSize: minimumSize).filter { $0.pid == pid }
+        let id = WindowFocuser.shared.windowID(of: element)
+        if let id, let match = candidates.first(where: { $0.id == id }) { return match }
+        guard let frame = AX.frame(of: element) else { Log.info("no pude leer el frame AX de la ventana con foco"); return nil }
+        if let match = candidates.first(where: { abs($0.bounds.minX - frame.minX) < 2 && abs($0.bounds.minY - frame.minY) < 2
+            && abs($0.bounds.width - frame.width) < 2 && abs($0.bounds.height - frame.height) < 2 }) {
+            return match
+        }
+        if let id {
+            Log.info("la ventana con foco #\(id) no está en pantalla (¿otro escritorio?); la uso igual")
+            return WindowInfo(id: id, pid: pid, ownerName: app.localizedName ?? "pid \(pid)", bounds: frame)
+        }
+        Log.info("ventana con foco de \(app.localizedName ?? "?") sin id ni frame conocido; visibles: \(candidates.map(\.id))")
+        return nil
     }
 }
 

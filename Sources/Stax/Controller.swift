@@ -50,6 +50,12 @@ final class Controller {
     }
 
     func perform(_ action: Action, column override: Int? = nil) {
+        switch action {
+        case .shareFocusedWindow: shareFocusedWindow(); return
+        case .stopSharing: ShareMirror.shared.stop(); return
+        default: break
+        }
+
         guard let target = target() else {
             Log.warn("no pude determinar la pantalla/columna objetivo")
             return
@@ -97,9 +103,24 @@ final class Controller {
                 }
             }
 
-        case .moveToColumn:
-            break // manejado arriba
+        case .moveToColumn, .shareFocusedWindow, .stopSharing:
+            break // manejados arriba
         }
+    }
+
+    // MARK: - Compartir
+
+    /// La ventana con foco pasa a ser la que refleja "Stax Share".
+    func shareFocusedWindow() {
+        if NSWorkspace.shared.frontmostApplication?.processIdentifier == getpid() {
+            Log.warn("la ventana con foco es la de Stax; enfocá la que querés compartir")
+            return
+        }
+        guard let window = FocusedWindow.info(minimumSize: config.minimumWindowSize) else {
+            Log.warn("no hay ventana con foco para compartir")
+            return
+        }
+        ShareMirror.shared.share(window)
     }
 
     /// Mueve la ventana con foco a una columna (0-based) de la pantalla donde está.

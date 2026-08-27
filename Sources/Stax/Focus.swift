@@ -52,6 +52,13 @@ final class WindowFocuser {
         Log.info("raise(AX) → \(window.ownerName) #\(window.id)")
     }
 
+    /// Id de CoreGraphics de una ventana AX (API privada `_AXUIElementGetWindow`).
+    func windowID(of element: AXUIElement) -> CGWindowID? {
+        guard let axGetWindow else { return nil }
+        var id: CGWindowID = 0
+        return axGetWindow(element, &id) == .success ? id : nil
+    }
+
     // MARK: - Privado
 
     private func raiseWithSkyLight(_ window: WindowInfo) -> Bool {
