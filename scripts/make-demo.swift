@@ -1,5 +1,5 @@
 // Genera las animaciones de docs/ (dibujadas con CoreGraphics, sin grabar pantalla).
-// Uso: swift scripts/make-demo.swift [cycle|focus|move ...]   (sin argumentos genera las tres)
+// Uso: swift scripts/make-demo.swift [cycle|focus|move|share ...]   (sin argumentos genera todas)
 //      STAX_DEMO_STILLS="1.4,3.0" swift scripts/make-demo.swift cycle   → exporta frames PNG a /tmp para revisar
 import AppKit
 import ImageIO
@@ -30,6 +30,7 @@ enum Kind {
     case cycle          // ⌘`: la del fondo de la columna activa pasa al frente
     case focus(Int)     // ⌃⌘←/→: el foco salta a otra columna
     case move(Int)      // ⌃⌥D/F/G: la ventana frontal de la columna activa se muda a otra columna
+    case share(auto: Bool)  // ⌃⌥S (o el modo automático): Stax Share pasa a reflejar la frontal de la columna activa
 }
 
 struct Event {
@@ -45,6 +46,7 @@ struct Demo {
     let idleCaption: String
     let duration: Double
     let events: [Event]
+    var mirror = false     // la tercera columna es la ventana Stax Share
 }
 
 let demos: [Demo] = [
@@ -64,6 +66,13 @@ let demos: [Demo] = [
         Event(time: 2.8, key: "⌃ ⌥ D", caption: "⌃⌥D  al primero", kind: .move(0)),
         Event(time: 4.6, key: "⌃ ⌥ F", caption: "⌃⌥F  y al medio. Chau, Rectangle.", kind: .move(1)),
     ]),
+    Demo(name: "share", subtitle: "compartí la ventana con foco en la videollamada", idleCaption: "En Meet/Zoom compartís la ventana Stax Share (a la derecha) una sola vez", duration: 7.8, events: [
+        Event(time: 1.0, key: "⌃ ⌥ S", caption: "⌃⌥S  Stax Share refleja la ventana con foco: Editor", kind: .share(auto: false)),
+        Event(time: 2.8, key: "⌃ ⌘ ←", caption: "⌃⌘←  con «Seguir la ventana con foco» activado…", kind: .focus(0)),
+        Event(time: 3.4, key: "↻ sigue el foco", caption: "…el espejo pasa solo a Browser, sin tocar la videollamada", kind: .share(auto: true)),
+        Event(time: 5.0, key: "⌘ `", caption: "⌘`  cicla la pila…", kind: .cycle),
+        Event(time: 5.6, key: "↻ sigue el foco", caption: "…y Stax Share ya muestra Notes. Del otro lado no se enteran.", kind: .share(auto: true)),
+    ], mirror: true),
 ]
 
 var demo = demos[0]
@@ -92,6 +101,9 @@ struct Scene {
     var moving: Moving?        // ventana en tránsito entre columnas
     var keyBadge: (String, Double)?
     var caption: String
+    var shared: Int?           // ventana que refleja Stax Share
+    var sharedPrev: Int?       // la anterior, durante el fundido
+    var shareProgress: Double  // 0→1 del fundido entre sharedPrev y shared
 }
 
 func scene(at t: Double) -> Scene {
@@ -103,6 +115,9 @@ func scene(at t: Double) -> Scene {
     var moving: Moving? = nil
     var badge: (String, Double)? = nil
     var caption = demo.idleCaption
+    var shared: Int? = nil
+    var sharedPrev: Int? = nil
+    var shareProgress = 1.0
 
     for e in events where t >= e.time {
         let elapsed = t - e.time
@@ -143,9 +158,18 @@ func scene(at t: Double) -> Scene {
             column[w] = p < 1 ? from : to
             moving = p < 1 ? Moving(window: w, from: from, to: to, progress: p) : nil
             focus += (Double(to) - focus) * p
+
+        case .share:
+            let w = orders[activeColumn].first!
+            if w != shared {
+                sharedPrev = shared
+                shared = w
+            }
+            shareProgress = easeInOut(elapsed / transition)
         }
     }
-    return Scene(column: column, depth: depth, focus: focus, rising: rising, moving: moving, keyBadge: badge, caption: caption)
+    return Scene(column: column, depth: depth, focus: focus, rising: rising, moving: moving, keyBadge: badge, caption: caption,
+                 shared: shared, sharedPrev: sharedPrev, shareProgress: shareProgress)
 }
 
 // MARK: - Dibujo
@@ -232,6 +256,10 @@ func drawFrame(t: Double, ctx: CGContext) {
         return CGRect(x: colRect.minX + offset, y: colRect.minY + offset, width: colRect.width * scale, height: colRect.height * scale)
     }
     for c in 0..<3 {
+        if demo.mirror && c == 2 {
+            drawMirror(in: windowRect(column: 2, depth: 0), scene: s, ctx: ctx)
+            continue
+        }
         var members = windows.indices.filter { s.column[$0] == c && s.moving?.window != $0 }
         members.sort { s.depth[$0] > s.depth[$1] }
         if let r = s.rising, let i = members.firstIndex(of: r) { members.remove(at: i); members.append(r) }
@@ -315,6 +343,53 @@ func drawWindow(_ win: Win, in r: CGRect, depth: CGFloat, ctx: CGContext) {
         ctx.setFillColor(NSColor.black.withAlphaComponent(min(depth, 2) * 0.12).cgColor)
         ctx.fillPath()
     }
+}
+
+/// La ventana Stax Share: oscura, con una miniatura de la ventana que refleja y un fundido al cambiar de origen.
+func drawMirror(in r: CGRect, scene s: Scene, ctx: CGContext) {
+    ctx.saveGState()
+    ctx.setShadow(offset: CGSize(width: 0, height: -4), blur: 14, color: NSColor.black.withAlphaComponent(0.45).cgColor)
+    ctx.addPath(roundedPath(r, 8))
+    ctx.setFillColor(NSColor(calibratedWhite: 0.12, alpha: 1).cgColor)
+    ctx.fillPath()
+    ctx.restoreGState()
+
+    let bar = CGRect(x: r.minX, y: r.maxY - 22, width: r.width, height: 22)
+    ctx.saveGState()
+    ctx.addPath(roundedPath(r, 8)); ctx.clip()
+    ctx.setFillColor(NSColor(calibratedWhite: 0.2, alpha: 1).cgColor)
+    ctx.fill(bar)
+    ctx.restoreGState()
+    for (i, color) in [NSColor(calibratedRed: 1, green: 0.37, blue: 0.34, alpha: 1), NSColor(calibratedRed: 1, green: 0.74, blue: 0.18, alpha: 1), NSColor(calibratedRed: 0.16, green: 0.78, blue: 0.25, alpha: 1)].enumerated() {
+        ctx.setFillColor(color.cgColor)
+        ctx.fillEllipse(in: CGRect(x: bar.minX + 8 + CGFloat(i) * 12, y: bar.midY - 3.5, width: 7, height: 7))
+    }
+    let title = s.shared.map { "Stax Share — \(windows[$0].title)" } ?? "Stax Share"
+    drawText(title, at: CGPoint(x: bar.minX + 48, y: bar.minY + 4), size: 11, weight: .semibold, color: NSColor.white.withAlphaComponent(0.85))
+
+    let content = CGRect(x: r.minX, y: r.minY, width: r.width, height: r.height - 22).insetBy(dx: 12, dy: 12)
+    guard let shared = s.shared else {
+        drawText("⌃⌥S para compartir", at: CGPoint(x: content.midX, y: content.midY - 8), size: 12, weight: .medium, color: NSColor.white.withAlphaComponent(0.4), centered: true)
+        return
+    }
+    let p = CGFloat(s.shareProgress)
+    if let prev = s.sharedPrev, p < 1 {
+        ctx.saveGState(); ctx.setAlpha(1 - p)
+        drawWindow(windows[prev], in: content, depth: 0, ctx: ctx)
+        ctx.restoreGState()
+    }
+    ctx.saveGState(); ctx.setAlpha(s.sharedPrev == nil ? 1 : p)
+    drawWindow(windows[shared], in: content, depth: 0, ctx: ctx)
+    ctx.restoreGState()
+
+    // Indicador "en vivo"
+    let pill = CGRect(x: r.maxX - 74, y: r.minY + 6, width: 66, height: 16)
+    ctx.addPath(roundedPath(pill, 8))
+    ctx.setFillColor(NSColor.black.withAlphaComponent(0.7).cgColor)
+    ctx.fillPath()
+    ctx.setFillColor(NSColor(calibratedRed: 1, green: 0.3, blue: 0.3, alpha: 1).cgColor)
+    ctx.fillEllipse(in: CGRect(x: pill.minX + 8, y: pill.midY - 3, width: 6, height: 6))
+    drawText("EN VIVO", at: CGPoint(x: pill.minX + 19, y: pill.minY + 2), size: 9, weight: .bold, color: .white)
 }
 
 // MARK: - Render a GIF

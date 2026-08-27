@@ -19,10 +19,13 @@ final class ShareMirror: NSObject {
     private var view: MirrorView?
     private var pollTimer: Timer?
     private var generation = 0   // invalida los resultados asincrónicos de un share() anterior
+    private var inFlight = false // hay un share() en curso; los siguientes se encolan (queda el último)
+    private var queued: WindowInfo?
     private let displayLayer = AVSampleBufferDisplayLayer()
     private let sampleQueue = DispatchQueue(label: "com.eugeniovaleiras.Stax.share")
 
     var isSharing: Bool { source != nil && stream != nil }
+    var isOpen: Bool { window != nil }
 
     static var hasPermission: Bool { CGPreflightScreenCaptureAccess() }
 
@@ -43,18 +46,26 @@ final class ShareMirror: NSObject {
     /// Empieza a reflejar `target` (o cambia la ventana de origen si ya hay captura).
     func share(_ target: WindowInfo) {
         guard ShareMirror.requestPermission() else { return }
+        if inFlight {
+            queued = target   // se procesa cuando termine el cambio en curso
+            return
+        }
+        inFlight = true
         generation += 1
         let gen = generation
         // onScreenWindowsOnly: false para poder compartir una ventana que está en otro escritorio.
         SCShareableContent.getExcludingDesktopWindows(false, onScreenWindowsOnly: false) { [weak self] content, error in
             DispatchQueue.main.async {
-                guard let self, gen == self.generation else { return }
+                guard let self else { return }
+                guard gen == self.generation else { self.finished(); return }
                 if let error {
                     Log.warn("no pude listar las ventanas para compartir: \(error.localizedDescription)")
+                    self.finished()
                     return
                 }
                 guard let scWindow = content?.windows.first(where: { $0.windowID == target.id }) else {
                     Log.warn("no encontré la ventana \(target.ownerName) #\(target.id) para compartir")
+                    self.finished()
                     return
                 }
                 self.start(scWindow, from: target, generation: gen)
@@ -62,9 +73,19 @@ final class ShareMirror: NSObject {
         }
     }
 
+    /// Cierra el share() en curso y arranca el que haya quedado encolado.
+    private func finished() {
+        inFlight = false
+        if let next = queued {
+            queued = nil
+            share(next)
+        }
+    }
+
     /// Detiene la captura y cierra la ventana espejo.
     func stop() {
         generation += 1
+        queued = nil
         stopCapture()
         source = nil
         if let window {
@@ -87,7 +108,9 @@ final class ShareMirror: NSObject {
 
         let finish: (Error?) -> Void = { [weak self] error in
             DispatchQueue.main.async {
-                guard let self, gen == self.generation else { return }
+                guard let self else { return }
+                defer { self.finished() }
+                guard gen == self.generation else { return }
                 if let error {
                     Log.warn("no pude compartir \(source.ownerName) #\(source.id): \(error.localizedDescription)")
                     self.stopCapture()
@@ -113,7 +136,8 @@ final class ShareMirror: NSObject {
         do {
             try stream.addStreamOutput(self, type: .screen, sampleHandlerQueue: sampleQueue)
         } catch {
-            finish(error)
+            Log.warn("no pude preparar la captura: \(error.localizedDescription)")
+            finished()
             return
         }
         self.stream = stream

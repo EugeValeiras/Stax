@@ -7,7 +7,7 @@ import ApplicationServices
 //   Stax list            → imprime las ventanas por columna y sale
 //   Stax do <acción> [N] → ejecuta cycleNext | cyclePrev | focusColumnLeft | focusColumnRight | moveToColumn
 //                                 (N = columna 1-based sobre la que actuar; por defecto, la de la ventana con foco)
-//                                 shareFocusedWindow y stopSharing sólo funcionan desde la app de barra de menú
+//                                 shareFocusedWindow, stopSharing y toggleFollowFocus sólo funcionan desde la app de barra de menú
 //   Stax screenshot-menu <png> → abre el menú de la barra, lo captura en <png> y sale (para la documentación)
 
 var arguments = Array(CommandLine.arguments.dropFirst())
@@ -47,7 +47,7 @@ case "do":
         print("Uso: Stax do cycleNext|cyclePrev|focusColumnLeft|focusColumnRight|moveToColumn [columna]")
         exit(2)
     }
-    if action == .shareFocusedWindow || action == .stopSharing {
+    if [.shareFocusedWindow, .stopSharing, .toggleFollowFocus].contains(action) {
         print("\(action.rawValue) necesita la ventana Stax Share: usá el atajo o el menú ⫼ con la app corriendo")
         exit(2)
     }
@@ -83,6 +83,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         statusMenu = StatusMenu(controller: controller) { [weak self] in self?.reloadConfig() }
         installHotkeys()
+        controller.applyFollowFocus()
 
         if let screenshotPath {
             statusMenu?.captureMenu(to: screenshotPath)
@@ -114,6 +115,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             Log.enableFileLogging()
         }
         installHotkeys()
+        controller.applyFollowFocus()
         Log.info("config recargada: \(controller.config)")
     }
 }

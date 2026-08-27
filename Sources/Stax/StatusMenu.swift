@@ -100,6 +100,10 @@ final class StatusMenu: NSObject, NSMenuDelegate {
             menu.addItem(disabled("   Compartiendo \(source.ownerName)\(title)"))
             menu.addItem(withTitle: "Dejar de compartir", action: #selector(stopSharing), keyEquivalent: "").target = self
         }
+        let follow = NSMenuItem(title: "Seguir la ventana con foco", action: #selector(toggleFollow), keyEquivalent: "")
+        follow.target = self
+        follow.state = config.shareFollowsFocus ? .on : .off
+        menu.addItem(follow)
         menu.addItem(.separator())
 
         menu.addItem(withTitle: "Abrir config.json", action: #selector(openConfig), keyEquivalent: "").target = self
@@ -165,6 +169,8 @@ final class StatusMenu: NSObject, NSMenuDelegate {
     }
 
     @objc private func stopSharing() { controller.perform(.stopSharing) }
+
+    @objc private func toggleFollow() { controller.perform(.toggleFollowFocus) }
 
     @objc private func setColumns(_ sender: NSMenuItem) {
         controller.config.columns = sender.tag
