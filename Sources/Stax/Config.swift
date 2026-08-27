@@ -9,6 +9,7 @@ enum Action: String, Codable {
     case moveToColumn       // mueve y redimensiona la ventana con foco a la columna `column` del atajo
     case shareFocusedWindow // la ventana con foco pasa a ser la que refleja la ventana "Stax Share"
     case stopSharing        // cierra la ventana "Stax Share"
+    case toggleFollowFocus  // activa/desactiva que "Stax Share" siga sola a la ventana con foco
 }
 
 enum ColumnSelection: String, Codable {
@@ -42,6 +43,7 @@ struct Config: Codable {
     var columns: Int = 3
     var columnSelection: ColumnSelection = .focused
     var hotkeys: [Hotkey] = Config.defaultHotkeys
+    var shareFollowsFocus: Bool = false       // con "Stax Share" abierta, sigue sola a la ventana con foco
     var raiseOnlyTargetWindow: Bool = true    // usa API privada para subir solo esa ventana
     var minimumWindowSize: Double = 120       // ignora ventanas más chicas (paneles, tooltips)
     var verbose: Bool = false                 // loguea atajos y acciones en ~/Library/Logs/Stax.log
@@ -55,6 +57,7 @@ struct Config: Codable {
         Hotkey(key: "f", modifiers: [.control, .option], action: .moveToColumn, column: 2),
         Hotkey(key: "g", modifiers: [.control, .option], action: .moveToColumn, column: 3),
         Hotkey(key: "s", modifiers: [.control, .option], action: .shareFocusedWindow),
+        Hotkey(key: "s", modifiers: [.control, .option, .shift], action: .toggleFollowFocus),
     ]
 
     static let directory = FileManager.default.homeDirectoryForCurrentUser
@@ -100,6 +103,7 @@ extension Config {
         columns = try c.decodeIfPresent(Int.self, forKey: .columns) ?? d.columns
         columnSelection = try c.decodeIfPresent(ColumnSelection.self, forKey: .columnSelection) ?? d.columnSelection
         hotkeys = try c.decodeIfPresent([Hotkey].self, forKey: .hotkeys) ?? d.hotkeys
+        shareFollowsFocus = try c.decodeIfPresent(Bool.self, forKey: .shareFollowsFocus) ?? d.shareFollowsFocus
         raiseOnlyTargetWindow = try c.decodeIfPresent(Bool.self, forKey: .raiseOnlyTargetWindow) ?? d.raiseOnlyTargetWindow
         minimumWindowSize = try c.decodeIfPresent(Double.self, forKey: .minimumWindowSize) ?? d.minimumWindowSize
         verbose = try c.decodeIfPresent(Bool.self, forKey: .verbose) ?? d.verbose

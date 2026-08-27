@@ -131,30 +131,40 @@ enum FocusedWindow {
     }
 
     /// La ventana con foco como `WindowInfo` (con su id de CoreGraphics). Cruza el elemento AX con la lista de
-    /// ventanas visibles por id o, si no, por frame; si tiene id pero no está en pantalla (otro escritorio),
-    /// la devuelve igual a partir del frame AX.
-    static func info(minimumSize: Double) -> WindowInfo? {
-        guard let app = NSWorkspace.shared.frontmostApplication else { Log.info("no hay app frontal"); return nil }
-        guard let element = element() else { Log.info("\(app.localizedName ?? "?") no tiene ventana con foco (AX)"); return nil }
+    /// ventanas visibles por id o, si no, por frame.
+    ///
+    /// `strict` (modo automático): sólo ventanas normales visibles; ignora sheets y diálogos y no loguea.
+    /// No estricto (⌃⌥S a mano): si tiene id pero no está en pantalla (otro escritorio), la devuelve igual.
+    static func info(minimumSize: Double, strict: Bool = false) -> WindowInfo? {
+        let log: (String) -> Void = strict ? { _ in } : { Log.info($0) }
+        guard let app = NSWorkspace.shared.frontmostApplication else { log("no hay app frontal"); return nil }
+        guard let element = element() else { log("\(app.localizedName ?? "?") no tiene ventana con foco (AX)"); return nil }
+        if strict, let subrole = AX.subrole(of: element), subrole != kAXStandardWindowSubrole { return nil }
         let pid = app.processIdentifier
         let candidates = WindowLister.onScreenWindows(minimumSize: minimumSize).filter { $0.pid == pid }
         let id = WindowFocuser.shared.windowID(of: element)
         if let id, let match = candidates.first(where: { $0.id == id }) { return match }
-        guard let frame = AX.frame(of: element) else { Log.info("no pude leer el frame AX de la ventana con foco"); return nil }
+        guard let frame = AX.frame(of: element) else { log("no pude leer el frame AX de la ventana con foco"); return nil }
         if let match = candidates.first(where: { abs($0.bounds.minX - frame.minX) < 2 && abs($0.bounds.minY - frame.minY) < 2
             && abs($0.bounds.width - frame.width) < 2 && abs($0.bounds.height - frame.height) < 2 }) {
             return match
         }
-        if let id {
-            Log.info("la ventana con foco #\(id) no está en pantalla (¿otro escritorio?); la uso igual")
+        if let id, !strict {
+            log("la ventana con foco #\(id) no está en pantalla (¿otro escritorio?); la uso igual")
             return WindowInfo(id: id, pid: pid, ownerName: app.localizedName ?? "pid \(pid)", bounds: frame)
         }
-        Log.info("ventana con foco de \(app.localizedName ?? "?") sin id ni frame conocido; visibles: \(candidates.map(\.id))")
+        log("ventana con foco de \(app.localizedName ?? "?") sin id ni frame conocido; visibles: \(candidates.map(\.id))")
         return nil
     }
 }
 
 enum AX {
+    static func subrole(of element: AXUIElement) -> String? {
+        var value: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(element, kAXSubroleAttribute as CFString, &value) == .success else { return nil }
+        return value as? String
+    }
+
     static func frame(of element: AXUIElement) -> CGRect? {
         var posValue: CFTypeRef?
         var sizeValue: CFTypeRef?

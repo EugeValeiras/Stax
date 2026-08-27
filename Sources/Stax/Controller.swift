@@ -53,6 +53,7 @@ final class Controller {
         switch action {
         case .shareFocusedWindow: shareFocusedWindow(); return
         case .stopSharing: ShareMirror.shared.stop(); return
+        case .toggleFollowFocus: toggleFollowFocus(); return
         default: break
         }
 
@@ -103,7 +104,7 @@ final class Controller {
                 }
             }
 
-        case .moveToColumn, .shareFocusedWindow, .stopSharing:
+        case .moveToColumn, .shareFocusedWindow, .stopSharing, .toggleFollowFocus:
             break // manejados arriba
         }
     }
@@ -120,6 +121,31 @@ final class Controller {
             Log.warn("no hay ventana con foco para compartir")
             return
         }
+        ShareMirror.shared.share(window)
+    }
+
+    // MARK: - Seguir el foco
+
+    /// Enciende o apaga el observador de foco según `config.shareFollowsFocus`.
+    func applyFollowFocus() {
+        let follower = FocusFollower.shared
+        follower.onFocusChange = { [weak self] in self?.followFocus() }
+        follower.isEnabled = config.shareFollowsFocus
+    }
+
+    func toggleFollowFocus() {
+        config.shareFollowsFocus.toggle()
+        config.save()
+        applyFollowFocus()
+    }
+
+    /// Con el espejo abierto, la ventana que acaba de tomar el foco pasa a ser el origen.
+    private func followFocus() {
+        guard config.shareFollowsFocus, ShareMirror.shared.isOpen else { return }
+        guard NSWorkspace.shared.frontmostApplication?.processIdentifier != getpid() else { return }
+        guard let window = FocusedWindow.info(minimumSize: config.minimumWindowSize, strict: true),
+              window.id != ShareMirror.shared.source?.id else { return }
+        Log.info("sigo el foco → \(window.ownerName) #\(window.id)")
         ShareMirror.shared.share(window)
     }
 

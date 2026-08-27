@@ -50,6 +50,8 @@ para eso, Stax lo reemplaza. Si lo dejás abierto con esos atajos, desactivalos 
 
 ### Cambiar la ventana que compartís en una videollamada — ⌃⌥S
 
+<img src="docs/demo-share.gif" width="960" alt="⌃⌥S hace que Stax Share refleje la ventana con foco; con «Seguir la ventana con foco» el espejo cambia solo">
+
 Ninguna app de videollamada deja cambiar desde afuera la ventana que se comparte. Stax lo resuelve con una ventana
 propia, **Stax Share**, que refleja en vivo el contenido de la ventana que elijas (con ScreenCaptureKit, así que
 funciona aunque la ventana original quede tapada). En Meet, Zoom o Slack compartís *Stax Share* una sola vez y,
@@ -60,6 +62,9 @@ desde ahí, cada vez que hacés foco en otra ventana y tocás ⌃⌥S, la videol
 - Su título es `Stax Share — App: título de la ventana`, para reconocerlo en el selector de la videollamada.
 - Si la ventana original se cierra, el espejo queda con un aviso; ⌃⌥S sobre otra lo retoma sin cortar la llamada.
 - *Dejar de compartir* en el menú ⫼ (o cerrar el espejo) termina la captura.
+- **Modo automático**: con *Seguir la ventana con foco* activado (menú ⫼, ⌃⌥⇧S o `shareFollowsFocus` en la
+  config), mientras Stax Share está abierta cada cambio de ventana con foco — otra app, ⌘`, ⌃⌘←/→ — cambia
+  solo el origen. Ignora diálogos y sheets, y la propia ventana Stax Share (podés moverla sin que pase nada).
 
 Necesita el permiso de **Grabación de pantalla** (lo pide la primera vez que usás ⌃⌥S).
 
@@ -75,6 +80,7 @@ Necesita el permiso de **Grabación de pantalla** (lo pide la primera vez que us
 | ⌃⌥F | `moveToColumn` 2 | Mueve la ventana con foco al tercio del medio |
 | ⌃⌥G | `moveToColumn` 3 | Mueve la ventana con foco al último tercio |
 | ⌃⌥S | `shareFocusedWindow` | La ventana con foco pasa a ser la que refleja *Stax Share* |
+| ⌃⌥⇧S | `toggleFollowFocus` | Activa/desactiva que *Stax Share* siga sola a la ventana con foco |
 
 ## El menú
 
@@ -88,6 +94,7 @@ Desde el ícono ⫼ de la barra de menú:
   columna activa. Elegí una ventana del submenú para traerla al frente (con ⌥ apretada, para compartirla), o
   *Mover la ventana con foco acá*.
 - **Compartir la ventana con foco** / **Dejar de compartir**: lo mismo que ⌃⌥S, y qué se está compartiendo.
+- **Seguir la ventana con foco**: el modo automático de Stax Share (✓ cuando está activo).
 - **Columnas**: 2, 3 o 4 columnas.
 - **Columna objetivo**: *Ventana con foco* (por defecto) o *Bajo el puntero*.
 - **Abrir config.json** / **Recargar config** (⌘R): para cambiar atajos y ajustes finos.
@@ -130,8 +137,10 @@ Desde el ícono ⫼ de la barra de menú:
     { "key": "d", "modifiers": ["control", "option"], "action": "moveToColumn", "column": 1 },
     { "key": "f", "modifiers": ["control", "option"], "action": "moveToColumn", "column": 2 },
     { "key": "g", "modifiers": ["control", "option"], "action": "moveToColumn", "column": 3 },
-    { "key": "s", "modifiers": ["control", "option"], "action": "shareFocusedWindow" }
+    { "key": "s", "modifiers": ["control", "option"], "action": "shareFocusedWindow" },
+    { "key": "s", "modifiers": ["control", "option", "shift"], "action": "toggleFollowFocus" }
   ],
+  "shareFollowsFocus": false,
   "raiseOnlyTargetWindow": true,
   "minimumWindowSize": 120,
   "verbose": false
@@ -144,7 +153,8 @@ Desde el ícono ⫼ de la barra de menú:
   siendo "`" y no "~".
 - `hotkeys[].modifiers`: combinación de `command`, `option`, `control`, `shift`.
 - `hotkeys[].action`: `cycleNext`, `cyclePrev`, `focusColumnLeft`, `focusColumnRight`, `moveToColumn`
-  (este último con `column`, 1-based), `shareFocusedWindow`, `stopSharing`.
+  (este último con `column`, 1-based), `shareFocusedWindow`, `stopSharing`, `toggleFollowFocus`.
+- `shareFollowsFocus`: con Stax Share abierta, el espejo sigue solo a la ventana con foco.
 - `raiseOnlyTargetWindow`: usa la API privada de SkyLight (técnica de AltTab/yabai) para subir sólo esa
   ventana. En `false` usa Accessibility puro, que trae todas las ventanas de la app.
 - `verbose`: escribe cada atajo y acción en `~/Library/Logs/Stax.log`.
@@ -164,7 +174,7 @@ Todo lo visual se genera por código, sin assets externos:
 
 ```bash
 swift scripts/make-icon.swift && iconutil -c icns Resources/AppIcon.iconset -o Resources/AppIcon.icns
-swift scripts/make-demo.swift                             # docs/demo-{cycle,focus,move}.gif
+swift scripts/make-demo.swift                             # docs/demo-{cycle,focus,move,share}.gif
 build/Stax.app/Contents/MacOS/Stax screenshot-menu docs/menu.png   # captura real del menú
 ```
 
@@ -179,6 +189,8 @@ build/Stax.app/Contents/MacOS/Stax screenshot-menu docs/menu.png   # captura rea
 - `Share.swift`: `SCStream` sobre una sola ventana (`SCContentFilter(desktopIndependentWindow:)`) dibujado en un
   `AVSampleBufferDisplayLayer` dentro de la ventana *Stax Share*; cambiar de origen es `updateContentFilter`, sin
   cortar la captura.
+- `Follow.swift`: `NSWorkspace.didActivateApplicationNotification` + `AXObserver` sobre la app frontal
+  (`kAXFocusedWindowChangedNotification`) para el modo automático.
 
 ## Licencia
 
