@@ -84,10 +84,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         statusMenu = StatusMenu(controller: controller) { [weak self] in self?.reloadConfig() }
         installHotkeys()
         controller.applyFollowFocus()
+        Bridge.shared.onShareFailed = { id in controller.fallbackToMirror(windowID: id) }
+        Bridge.shared.start()
 
         if let screenshotPath {
             statusMenu?.captureMenu(to: screenshotPath)
             return
+        }
+
+        // Primera vez: el asistente explica los permisos y deja todo configurado.
+        if !controller.config.setupCompleted {
+            SetupWizard.shared.present(controller: controller)
         }
 
         // Si todavía no hay permiso, reintentamos hasta que el usuario lo otorgue.
@@ -99,6 +106,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 if HotkeyManager.shared.isInstalled { timer.invalidate() }
             }
         }
+    }
+
+    func applicationWillTerminate(_ notification: Notification) {
+        Bridge.shared.stop()   // borra el .sock para que el plugin no se cuelgue de un socket muerto
     }
 
     private func installHotkeys() {

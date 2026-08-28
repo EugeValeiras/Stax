@@ -1,5 +1,6 @@
 // Genera las animaciones de docs/ (dibujadas con CoreGraphics, sin grabar pantalla).
-// Uso: swift scripts/make-demo.swift [cycle|focus|move|share ...]   (sin argumentos genera todas)
+// Uso: swift scripts/make-demo.swift [cycle|focus|move|share|columns-2|columns-3|columns-4 ...]
+//      (sin argumentos genera todas)
 //      STAX_DEMO_STILLS="1.4,3.0" swift scripts/make-demo.swift cycle   → exporta frames PNG a /tmp para revisar
 import AppKit
 import ImageIO
@@ -46,8 +47,14 @@ struct Demo {
     let idleCaption: String
     let duration: Double
     let events: [Event]
-    var mirror = false     // la tercera columna es la ventana Stax Share
+    var mirror = false        // la tercera columna es la ventana Stax Share
+    var columns = 3           // en cuántas partes se divide la pantalla
+    var layout: [Int]? = nil  // columna inicial de cada ventana; nil = la que trae `windows`
+    var initialFocus = 1.0    // columna con foco al empezar
 }
+
+/// Columna donde arranca la ventana `w` en la demo actual.
+func startColumn(_ w: Int) -> Int { demo.layout?[w] ?? windows[w].column }
 
 let demos: [Demo] = [
     Demo(name: "cycle", subtitle: "cambiá de ventana dentro del tercio activo", idleCaption: "Tres ventanas apiladas en el tercio del medio", duration: 5.6, events: [
@@ -66,6 +73,30 @@ let demos: [Demo] = [
         Event(time: 2.8, key: "⌃ ⌥ D", caption: "⌃⌥D  al primero", kind: .move(0)),
         Event(time: 4.6, key: "⌃ ⌥ F", caption: "⌃⌥F  y al medio. Chau, Rectangle.", kind: .move(1)),
     ]),
+    Demo(name: "columns-2", subtitle: "dos mitades", idleCaption: "Con 2 columnas, cada mitad es su propia pila",
+         duration: 4.8, events: [
+        Event(time: 0.9, key: "⌃ ⌘ ←", caption: "⌃⌘←  el foco salta a la mitad izquierda", kind: .focus(0)),
+        Event(time: 2.2, key: "⌘ `", caption: "⌘`  cicla las ventanas de esa mitad", kind: .cycle),
+        Event(time: 3.5, key: "⌃ ⌘ →", caption: "⌃⌘→  y vuelve a la derecha", kind: .focus(1)),
+    ], columns: 2, layout: [0, 0, 0, 1, 1, 1], initialFocus: 1),
+
+    Demo(name: "columns-3", subtitle: "tres tercios", idleCaption: "Con 3 columnas, cada tercio es su propia pila",
+         duration: 5.6, events: [
+        Event(time: 0.9, key: "⌃ ⌘ ←", caption: "⌃⌘←  el foco salta al primer tercio", kind: .focus(0)),
+        Event(time: 2.2, key: "⌘ `", caption: "⌘`  cicla las ventanas de ese tercio", kind: .cycle),
+        Event(time: 3.4, key: "⌃ ⌘ →", caption: "⌃⌘→  al del medio", kind: .focus(1)),
+        Event(time: 4.4, key: "⌃ ⌘ →", caption: "⌃⌘→  y al tercero", kind: .focus(2)),
+    ], columns: 3, layout: [0, 0, 1, 1, 1, 2], initialFocus: 1),
+
+    Demo(name: "columns-4", subtitle: "cuatro columnas", idleCaption: "Con 4 columnas entran cuatro pilas independientes",
+         duration: 6.0, events: [
+        Event(time: 0.9, key: "⌃ ⌘ ←", caption: "⌃⌘←  el foco salta a la primera columna", kind: .focus(0)),
+        Event(time: 2.0, key: "⌘ `", caption: "⌘`  cicla las ventanas de esa columna", kind: .cycle),
+        Event(time: 3.2, key: "⌃ ⌘ →", caption: "⌃⌘→  a la segunda", kind: .focus(1)),
+        Event(time: 4.1, key: "⌃ ⌘ →", caption: "⌃⌘→  a la tercera", kind: .focus(2)),
+        Event(time: 5.0, key: "⌃ ⌘ →", caption: "⌃⌘→  y a la cuarta", kind: .focus(3)),
+    ], columns: 4, layout: [0, 0, 1, 2, 2, 3], initialFocus: 1),
+
     Demo(name: "share", subtitle: "compartí la ventana con foco en la videollamada", idleCaption: "En Meet/Zoom compartís la ventana Stax Share (a la derecha) una sola vez", duration: 7.8, events: [
         Event(time: 1.0, key: "⌃ ⌥ S", caption: "⌃⌥S  Stax Share refleja la ventana con foco: Editor", kind: .share(auto: false)),
         Event(time: 2.8, key: "⌃ ⌘ ←", caption: "⌃⌘←  con «Seguir la ventana con foco» activado…", kind: .focus(0)),
@@ -107,10 +138,10 @@ struct Scene {
 }
 
 func scene(at t: Double) -> Scene {
-    var orders: [[Int]] = (0..<3).map { c in windows.indices.filter { windows[$0].column == c } }
-    var column = windows.map(\.column)
-    var depth = windows.indices.map { Double(orders[windows[$0].column].firstIndex(of: $0)!) }
-    var focus = 1.0
+    var orders: [[Int]] = (0..<demo.columns).map { c in windows.indices.filter { startColumn($0) == c } }
+    var column = windows.indices.map { startColumn($0) }
+    var depth = windows.indices.map { Double(orders[startColumn($0)].firstIndex(of: $0)!) }
+    var focus = demo.initialFocus
     var rising: Int? = nil
     var moving: Moving? = nil
     var badge: (String, Double)? = nil
@@ -223,11 +254,11 @@ func drawFrame(t: Double, ctx: CGContext) {
     ctx.drawLinearGradient(wall, start: CGPoint(x: screen.minX, y: screen.minY), end: CGPoint(x: screen.maxX, y: screen.maxY), options: [])
 
     // Guías de tercios
-    let colW = screen.width / 3
+    let colW = screen.width / CGFloat(demo.columns)
     ctx.setStrokeColor(NSColor.white.withAlphaComponent(0.18).cgColor)
     ctx.setLineWidth(1)
     ctx.setLineDash(phase: 0, lengths: [5, 5])
-    for i in 1..<3 {
+    for i in 1..<demo.columns {
         let x = screen.minX + colW * CGFloat(i)
         ctx.move(to: CGPoint(x: x, y: screen.minY)); ctx.addLine(to: CGPoint(x: x, y: screen.maxY))
     }
@@ -255,7 +286,7 @@ func drawFrame(t: Double, ctx: CGContext) {
         let scale = 1 - d * 0.04
         return CGRect(x: colRect.minX + offset, y: colRect.minY + offset, width: colRect.width * scale, height: colRect.height * scale)
     }
-    for c in 0..<3 {
+    for c in 0..<demo.columns {
         if demo.mirror && c == 2 {
             drawMirror(in: windowRect(column: 2, depth: 0), scene: s, ctx: ctx)
             continue

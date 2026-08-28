@@ -52,7 +52,7 @@ final class Controller {
     func perform(_ action: Action, column override: Int? = nil) {
         switch action {
         case .shareFocusedWindow: shareFocusedWindow(); return
-        case .stopSharing: ShareMirror.shared.stop(); return
+        case .stopSharing: stopSharing(); return
         case .toggleFollowFocus: toggleFollowFocus(); return
         default: break
         }
@@ -111,7 +111,7 @@ final class Controller {
 
     // MARK: - Compartir
 
-    /// La ventana con foco pasa a ser la que refleja "Stax Share".
+    /// La ventana con foco pasa a ser la que se comparte, por Discord o por el espejo según `shareBackend`.
     func shareFocusedWindow() {
         if NSWorkspace.shared.frontmostApplication?.processIdentifier == getpid() {
             Log.warn("la ventana con foco es la de Stax; enfocá la que querés compartir")
@@ -121,7 +121,64 @@ final class Controller {
             Log.warn("no hay ventana con foco para compartir")
             return
         }
+        share(window)
+    }
+
+    /// Manda `window` al backend que corresponda. Si Discord estaba elegido pero no contesta, cae al espejo:
+    /// más vale compartir por el camino largo que no compartir.
+    func share(_ window: WindowInfo) {
+        if preferDiscord() {
+            if Bridge.shared.share(window) { return }
+            let why = Bridge.shared.state.connected
+                ? (Bridge.shared.state.inVoice ? "el puente no aceptó el pedido" : "no estás en un canal de voz")
+                : "el plugin StaxBridge no está conectado"
+            Log.warn("Discord no puede transmitir (\(why)); uso el espejo")
+        }
+        ShareMirror.shared.usesVirtualDisplay = config.shareUsesVirtualDisplay
         ShareMirror.shared.share(window)
+    }
+
+    /// ¿Sale por Discord esta vez?
+    ///
+    /// En `auto`, si el espejo ya está abierto se queda con el espejo: probablemente haya una llamada de Meet
+    /// o Zoom mostrándolo, y cambiar de backend en el medio la dejaría con una ventana congelada.
+    private func preferDiscord() -> Bool {
+        switch config.shareBackend {
+        case .mirror:
+            return false
+        case .discord:
+            if !Bridge.shared.state.connected {
+                Log.warn("shareBackend=discord pero el plugin StaxBridge no está conectado")
+                return false
+            }
+            return true
+        case .auto:
+            guard !ShareMirror.shared.isOpen else { return false }
+            return Bridge.shared.state.connected && Bridge.shared.state.inVoice
+        }
+    }
+
+    /// El plugin no pudo con la ventana: la mostramos por el espejo, que es el camino que siempre funciona.
+    func fallbackToMirror(windowID: CGWindowID) {
+        guard let window = WindowLister.onScreenWindows(minimumSize: config.minimumWindowSize)
+            .first(where: { $0.id == windowID }) else {
+            Log.warn("el puente no pudo compartir #\(windowID) y la ventana ya no está; no hago nada")
+            return
+        }
+        Log.info("el puente no pudo; muestro \(window.ownerName) #\(window.id) por el espejo")
+        ShareMirror.shared.usesVirtualDisplay = config.shareUsesVirtualDisplay
+        ShareMirror.shared.share(window)
+    }
+
+    /// Corta lo que se esté compartiendo, sea el espejo o la transmisión de Discord.
+    func stopSharing() {
+        Bridge.shared.stopSharing()
+        ShareMirror.shared.stop()
+    }
+
+    /// Hay algo compartiéndose ahora mismo (por cualquiera de los dos caminos).
+    var isSharing: Bool {
+        ShareMirror.shared.isOpen || Bridge.shared.state.streaming
     }
 
     // MARK: - Seguir el foco
@@ -139,14 +196,16 @@ final class Controller {
         applyFollowFocus()
     }
 
-    /// Con el espejo abierto, la ventana que acaba de tomar el foco pasa a ser el origen.
+    /// Mientras se esté compartiendo algo, la ventana que acaba de tomar el foco pasa a ser el origen.
     private func followFocus() {
-        guard config.shareFollowsFocus, ShareMirror.shared.isOpen else { return }
+        guard config.shareFollowsFocus, isSharing else { return }
         guard NSWorkspace.shared.frontmostApplication?.processIdentifier != getpid() else { return }
-        guard let window = FocusedWindow.info(minimumSize: config.minimumWindowSize, strict: true),
-              window.id != ShareMirror.shared.source?.id else { return }
+        guard let window = FocusedWindow.info(minimumSize: config.minimumWindowSize, strict: true) else { return }
+        // Ya es la que se está compartiendo: no hay nada que hacer.
+        if ShareMirror.shared.isOpen, window.id == ShareMirror.shared.source?.id { return }
+        if !ShareMirror.shared.isOpen, window.id == Bridge.shared.requestedWindowID { return }
         Log.info("sigo el foco → \(window.ownerName) #\(window.id)")
-        ShareMirror.shared.share(window)
+        share(window)
     }
 
     /// Mueve la ventana con foco a una columna (0-based) de la pantalla donde está.

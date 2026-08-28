@@ -12,9 +12,40 @@ enum Action: String, Codable {
     case toggleFollowFocus  // activa/desactiva que "Stax Share" siga sola a la ventana con foco
 }
 
+extension Action {
+    /// Cómo se le explica la acción a alguien, en vez del nombre técnico que va en config.json.
+    var humanDescription: String {
+        switch self {
+        case .cycleNext: return "Ciclar las ventanas del tercio activo"
+        case .cyclePrev: return "Ciclar al revés"
+        case .focusColumnLeft: return "Foco al tercio de la izquierda"
+        case .focusColumnRight: return "Foco al tercio de la derecha"
+        case .moveToColumn: return "Mover la ventana con foco a un tercio"
+        case .shareFocusedWindow: return "Compartir la ventana con foco"
+        case .stopSharing: return "Dejar de compartir"
+        case .toggleFollowFocus: return "Que lo compartido siga al foco"
+        }
+    }
+}
+
 enum ColumnSelection: String, Codable {
     case focused   // la columna donde está la ventana con foco
     case pointer   // la columna bajo el puntero del mouse
+}
+
+/// Por dónde sale la ventana que se comparte.
+enum ShareBackend: String, Codable, CaseIterable {
+    case auto      // Discord si el puente está listo y hay canal de voz; si no, el espejo
+    case mirror    // siempre la ventana espejo "Stax Share" (sirve para Meet, Zoom, Slack)
+    case discord   // siempre Discord, vía el plugin StaxBridge
+
+    var label: String {
+        switch self {
+        case .auto: return "Automático"
+        case .mirror: return "Ventana espejo (Stax Share)"
+        case .discord: return "Discord (plugin StaxBridge)"
+        }
+    }
 }
 
 enum Modifier: String, Codable, CaseIterable {
@@ -44,9 +75,12 @@ struct Config: Codable {
     var columnSelection: ColumnSelection = .focused
     var hotkeys: [Hotkey] = Config.defaultHotkeys
     var shareFollowsFocus: Bool = false       // con "Stax Share" abierta, sigue sola a la ventana con foco
+    var shareBackend: ShareBackend = .auto    // espejo, Discord vía el plugin StaxBridge, o el que haya
+    var shareUsesVirtualDisplay: Bool = false // el espejo vive en una pantalla virtual, no en el escritorio
     var raiseOnlyTargetWindow: Bool = true    // usa API privada para subir solo esa ventana
     var minimumWindowSize: Double = 120       // ignora ventanas más chicas (paneles, tooltips)
     var verbose: Bool = false                 // loguea atajos y acciones en ~/Library/Logs/Stax.log
+    var setupCompleted: Bool = false          // el asistente ya se mostró (se abre solo la primera vez)
 
     static let defaultHotkeys: [Hotkey] = [
         Hotkey(key: "`", modifiers: [.command], action: .cycleNext),
@@ -104,9 +138,12 @@ extension Config {
         columnSelection = try c.decodeIfPresent(ColumnSelection.self, forKey: .columnSelection) ?? d.columnSelection
         hotkeys = try c.decodeIfPresent([Hotkey].self, forKey: .hotkeys) ?? d.hotkeys
         shareFollowsFocus = try c.decodeIfPresent(Bool.self, forKey: .shareFollowsFocus) ?? d.shareFollowsFocus
+        shareBackend = try c.decodeIfPresent(ShareBackend.self, forKey: .shareBackend) ?? d.shareBackend
+        shareUsesVirtualDisplay = try c.decodeIfPresent(Bool.self, forKey: .shareUsesVirtualDisplay) ?? d.shareUsesVirtualDisplay
         raiseOnlyTargetWindow = try c.decodeIfPresent(Bool.self, forKey: .raiseOnlyTargetWindow) ?? d.raiseOnlyTargetWindow
         minimumWindowSize = try c.decodeIfPresent(Double.self, forKey: .minimumWindowSize) ?? d.minimumWindowSize
         verbose = try c.decodeIfPresent(Bool.self, forKey: .verbose) ?? d.verbose
+        setupCompleted = try c.decodeIfPresent(Bool.self, forKey: .setupCompleted) ?? d.setupCompleted
     }
 }
 

@@ -95,17 +95,47 @@ final class StatusMenu: NSObject, NSMenuDelegate {
         let shareItem = NSMenuItem(title: "Compartir la ventana con foco", action: #selector(shareFocused), keyEquivalent: "")
         shareItem.target = self
         menu.addItem(shareItem)
+
         if let source = ShareMirror.shared.source {
             let title = source.title.map { ": \($0)" } ?? ""
-            menu.addItem(disabled("   Compartiendo \(source.ownerName)\(title)"))
+            menu.addItem(disabled("   Compartiendo por el espejo — \(source.ownerName)\(title)"))
+        } else if let sharing = Bridge.shared.state.sharingDescription {
+            menu.addItem(disabled("   Transmitiendo en Discord — \(sharing)"))
+        }
+        if controller.isSharing {
             menu.addItem(withTitle: "Dejar de compartir", action: #selector(stopSharing), keyEquivalent: "").target = self
         }
+
         let follow = NSMenuItem(title: "Seguir la ventana con foco", action: #selector(toggleFollow), keyEquivalent: "")
         follow.target = self
         follow.state = config.shareFollowsFocus ? .on : .off
         menu.addItem(follow)
+
+        let backendItem = NSMenuItem(title: "Compartir por", action: nil, keyEquivalent: "")
+        let backendMenu = NSMenu()
+        for backend in ShareBackend.allCases {
+            let entry = NSMenuItem(title: backend.label, action: #selector(setBackend(_:)), keyEquivalent: "")
+            entry.target = self
+            entry.representedObject = backend.rawValue
+            entry.state = backend == config.shareBackend ? .on : .off
+            backendMenu.addItem(entry)
+        }
+        backendMenu.addItem(.separator())
+        backendMenu.addItem(disabled(bridgeStatus()))
+        backendItem.submenu = backendMenu
+        menu.addItem(backendItem)
+
+        let virtual = NSMenuItem(title: "Espejo en una pantalla virtual", action: #selector(toggleVirtualDisplay), keyEquivalent: "")
+        virtual.target = self
+        virtual.state = config.shareUsesVirtualDisplay ? .on : .off
+        virtual.isEnabled = VirtualDisplay.isAvailable
+        if !VirtualDisplay.isAvailable {
+            virtual.title = "Espejo en una pantalla virtual (no disponible en este macOS)"
+        }
+        menu.addItem(virtual)
         menu.addItem(.separator())
 
+        menu.addItem(withTitle: "Asistente de configuración…", action: #selector(openSetup), keyEquivalent: "").target = self
         menu.addItem(withTitle: "Abrir config.json", action: #selector(openConfig), keyEquivalent: "").target = self
         menu.addItem(withTitle: "Recargar config", action: #selector(reload), keyEquivalent: "r").target = self
         menu.addItem(.separator())
@@ -143,6 +173,14 @@ final class StatusMenu: NSObject, NSMenuDelegate {
         statusItem.button?.performClick(nil)
     }
 
+    /// Una línea que explica en qué anda el puente con Discord, para no tener que ir al log.
+    private func bridgeStatus() -> String {
+        let state = Bridge.shared.state
+        guard state.connected else { return "Plugin StaxBridge: no conectado" }
+        return state.inVoice ? "Plugin StaxBridge: listo (en un canal de voz)"
+                             : "Plugin StaxBridge: conectado, sin canal de voz"
+    }
+
     private func disabled(_ title: String) -> NSMenuItem {
         let item = NSMenuItem(title: title, action: nil, keyEquivalent: "")
         item.isEnabled = false
@@ -160,7 +198,7 @@ final class StatusMenu: NSObject, NSMenuDelegate {
 
     @objc private func shareWindow(_ sender: NSMenuItem) {
         guard let box = sender.representedObject as? WindowBox else { return }
-        ShareMirror.shared.share(box.window)
+        controller.share(box.window)
     }
 
     @objc private func shareFocused() {
@@ -181,6 +219,28 @@ final class StatusMenu: NSObject, NSMenuDelegate {
         guard let raw = sender.representedObject as? String, let mode = ColumnSelection(rawValue: raw) else { return }
         controller.config.columnSelection = mode
         controller.config.save()
+    }
+
+    @objc private func toggleVirtualDisplay() {
+        controller.config.shareUsesVirtualDisplay.toggle()
+        controller.config.save()
+        // El cambio se aplica al próximo ⌃⌥S; si hay algo compartiéndose ahora, lo movemos ya.
+        if let source = ShareMirror.shared.source {
+            ShareMirror.shared.stop()
+            controller.share(source)
+        }
+        Log.info("espejo en pantalla virtual: \(controller.config.shareUsesVirtualDisplay)")
+    }
+
+    @objc private func setBackend(_ sender: NSMenuItem) {
+        guard let raw = sender.representedObject as? String, let backend = ShareBackend(rawValue: raw) else { return }
+        controller.config.shareBackend = backend
+        controller.config.save()
+        Log.info("compartir por: \(backend.rawValue)")
+    }
+
+    @objc private func openSetup() {
+        SetupWizard.shared.present(controller: controller)
     }
 
     @objc private func openConfig() {

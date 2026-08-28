@@ -32,7 +32,7 @@ struct Hotkey: Codable, Equatable {
         case "space": keyName = "␣"
         case "escape": keyName = "⎋"
         case "return": keyName = "↩"
-        default: keyName = key
+        default: keyName = key.count == 1 ? key.uppercased() : key
         }
         return mods + keyName
     }

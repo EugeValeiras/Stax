@@ -14,6 +14,8 @@ cp .build/release/Stax "$APP/Contents/MacOS/Stax"
 cp Resources/Info.plist "$APP/Contents/Info.plist"
 mkdir -p "$APP/Contents/Resources"
 cp Resources/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
+# Los mismos GIFs del README: el asistente los muestra para explicar cada atajo.
+cp docs/demo-cycle.gif docs/demo-share.gif docs/demo-columns-2.gif docs/demo-columns-3.gif docs/demo-columns-4.gif "$APP/Contents/Resources/"
 
 codesign --force --sign "${SIGN_IDENTITY:--}" --identifier com.eugeniovaleiras.Stax "$APP"
 echo "Listo: $APP"

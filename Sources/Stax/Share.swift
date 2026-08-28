@@ -14,10 +14,15 @@ final class ShareMirror: NSObject {
     /// Ventana que se está reflejando (nil si no hay captura activa).
     private(set) var source: WindowInfo?
 
+    /// Con esto en true el espejo vive en una pantalla virtual en vez de ocupar lugar en el escritorio.
+    /// Lo setea el Controller desde la config antes de cada `share()`.
+    var usesVirtualDisplay = false
+
     private var stream: SCStream?
     private var window: NSWindow?
     private var view: MirrorView?
     private var pollTimer: Timer?
+    private var windowIsBorderless = false
     private var generation = 0   // invalida los resultados asincrónicos de un share() anterior
     private var inFlight = false // hay un share() en curso; los siguientes se encolan (queda el último)
     private var queued: WindowInfo?
@@ -46,6 +51,10 @@ final class ShareMirror: NSObject {
     /// Empieza a reflejar `target` (o cambia la ventana de origen si ya hay captura).
     func share(_ target: WindowInfo) {
         guard ShareMirror.requestPermission() else { return }
+        // Si no se pudo crear la pantalla virtual, el espejo cae en una ventana común: nadie se queda sin compartir.
+        if usesVirtualDisplay, !VirtualDisplay.shared.isActive, !VirtualDisplay.shared.start() {
+            usesVirtualDisplay = false
+        }
         if inFlight {
             queued = target   // se procesa cuando termine el cambio en curso
             return
@@ -93,6 +102,7 @@ final class ShareMirror: NSObject {
             self.view = nil
             window.close()
         }
+        VirtualDisplay.shared.stop()
         Log.info("dejo de compartir")
     }
 
@@ -227,7 +237,18 @@ final class ShareMirror: NSObject {
     /// Muestra el espejo del tamaño de la ventana de origen (acotado a la pantalla), conservando su esquina
     /// superior izquierda, sin robarle el foco a la ventana que se está compartiendo.
     private func showWindow(for source: WindowInfo) {
-        let window = self.window ?? makeWindow()
+        // Con la pantalla virtual, el espejo la ocupa entera: en la llamada se comparte esa "pantalla"
+        // y el tamaño de la ventana original deja de importar.
+        if usesVirtualDisplay, let virtual = VirtualDisplay.shared.screen {
+            let window = self.window(borderless: true)
+            window.title = ShareMirror.title(for: source)
+            window.setFrame(virtual.frame, display: true)
+            view?.message = nil
+            if !window.isVisible { window.orderFrontRegardless() }
+            return
+        }
+
+        let window = self.window(borderless: false)
         window.title = ShareMirror.title(for: source)
 
         let screen = window.screen ?? NSScreen.main ?? NSScreen.screens[0]
@@ -249,20 +270,40 @@ final class ShareMirror: NSObject {
         if !window.isVisible { window.orderFrontRegardless() }
     }
 
-    private func makeWindow() -> NSWindow {
+    /// La ventana espejo del estilo pedido, rehaciéndola si venía del otro modo.
+    private func window(borderless: Bool) -> NSWindow {
+        if let existing = window, windowIsBorderless == borderless { return existing }
+        if let existing = window {
+            // `windowWillClose` mira `window` para distinguir el cierre del usuario: nil primero.
+            self.window = nil
+            self.view = nil
+            existing.close()
+        }
+        return makeWindow(borderless: borderless)
+    }
+
+    private func makeWindow(borderless: Bool) -> NSWindow {
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 960, height: 600),
-                              styleMask: [.titled, .closable, .resizable], backing: .buffered, defer: false)
+                              styleMask: borderless ? [.borderless] : [.titled, .closable, .resizable],
+                              backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
         window.delegate = self
         window.backgroundColor = .black
         window.tabbingMode = .disallowed
-        window.collectionBehavior = [.fullScreenNone]
         let view = MirrorView(displayLayer: displayLayer)
         window.contentView = view
-        window.center()
-        window.setFrameAutosaveName("StaxShare")   // recuerda dónde la dejó el usuario
+        if borderless {
+            // Que se quede en la pantalla virtual pase lo que pase con los escritorios.
+            window.collectionBehavior = [.fullScreenNone, .canJoinAllSpaces, .stationary]
+            window.level = .normal
+        } else {
+            window.collectionBehavior = [.fullScreenNone]
+            window.center()
+            window.setFrameAutosaveName("StaxShare")   // recuerda dónde la dejó el usuario
+        }
         self.window = window
         self.view = view
+        windowIsBorderless = borderless
         return window
     }
 
@@ -315,6 +356,7 @@ extension ShareMirror: NSWindowDelegate {
         generation += 1
         stopCapture()
         source = nil
+        VirtualDisplay.shared.stop()
         Log.info("espejo cerrado por el usuario; dejo de compartir")
     }
 }

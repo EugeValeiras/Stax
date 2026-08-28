@@ -63,10 +63,44 @@ desde ahí, cada vez que hacés foco en otra ventana y tocás ⌃⌥S, la videol
 - Si la ventana original se cierra, el espejo queda con un aviso; ⌃⌥S sobre otra lo retoma sin cortar la llamada.
 - *Dejar de compartir* en el menú ⫼ (o cerrar el espejo) termina la captura.
 - **Modo automático**: con *Seguir la ventana con foco* activado (menú ⫼, ⌃⌥⇧S o `shareFollowsFocus` en la
-  config), mientras Stax Share está abierta cada cambio de ventana con foco — otra app, ⌘`, ⌃⌘←/→ — cambia
+  config), mientras se esté compartiendo algo cada cambio de ventana con foco — otra app, ⌘`, ⌃⌘←/→ — cambia
   solo el origen. Ignora diálogos y sheets, y la propia ventana Stax Share (podés moverla sin que pase nada).
 
 Necesita el permiso de **Grabación de pantalla** (lo pide la primera vez que usás ⌃⌥S).
+
+#### El espejo, en una pantalla que no existe
+
+Con **Espejo en una pantalla virtual** (menú ⫼, o `shareUsesVirtualDisplay` en la config), Stax registra un
+monitor que no está enchufado a nada y pone el espejo ahí, ocupándolo entero. En la videollamada compartís la
+*pantalla* «Stax Share» en vez de una ventana:
+
+- El espejo deja de robarte lugar en el ultrawide: vive fuera de tus monitores reales.
+- La llamada recibe siempre 1920×1080 (a 2x), sin importar cuán grande sea la ventana original.
+
+La pantalla aparece al empezar a compartir y se da de baja al terminar; macOS reacomoda las ventanas como si
+enchufaras y desenchufaras un monitor. Usa la misma API privada de CoreGraphics que DeskPad y BetterDisplay;
+si un macOS futuro la saca, la opción se deshabilita sola y el espejo vuelve a ser una ventana común.
+
+#### En Discord, sin ventana espejo — el plugin StaxBridge
+
+Discord es el caso donde se puede hacer mejor: con el plugin [StaxBridge](VencordPlugin/) instalado en Vencord,
+⌃⌥S cambia **directamente la fuente del Go Live**, sin espejo y sin abrir el selector. Discord captura la
+ventana original con ScreenCaptureKit, a resolución nativa y con un solo encode; los del otro lado no ven ningún
+corte al cambiar de ventana.
+
+En el menú ⫼ → **Compartir por** elegís el camino:
+
+| Opción | Qué hace |
+|---|---|
+| *Automático* (por defecto) | Discord si el plugin está conectado y estás en un canal de voz; si no, el espejo. Si el espejo ya está abierto lo respeta, para no cortar una llamada de Meet en curso. |
+| *Ventana espejo* | Siempre el espejo, como antes. |
+| *Discord* | Siempre el plugin. |
+
+Si el plugin no puede (no hay canal de voz, Discord no ve la ventana), Stax cae al espejo solo.
+
+La instalación está en [`VencordPlugin/README.md`](VencordPlugin/README.md). Requiere **Vencord**, un mod de
+cliente de terceros que parchea `/Applications/Discord.app` (y por lo tanto rompe su firma) y va contra los
+Términos de Servicio de Discord; ahí están los detalles y cómo revertirlo.
 
 ### Todos los atajos
 
@@ -82,6 +116,21 @@ Necesita el permiso de **Grabación de pantalla** (lo pide la primera vez que us
 | ⌃⌥S | `shareFocusedWindow` | La ventana con foco pasa a ser la que refleja *Stax Share* |
 | ⌃⌥⇧S | `toggleFollowFocus` | Activa/desactiva que *Stax Share* siga sola a la ventana con foco |
 
+## El asistente de configuración
+
+La primera vez que abrís Stax aparece un asistente de cinco pasos que deja todo listo: muestra las mismas
+animaciones de este README, el estado en vivo de los dos permisos con un botón para otorgarlos, cómo se
+comparte en las videollamadas, y ofrece abrir Stax al iniciar sesión.
+
+En el paso de columnas hay una animación por cada cantidad — `docs/demo-columns-2.gif`, `-3` y `-4` — y al
+elegir 2, 3 o 4 la demo cambia con un fundido para que veas cómo queda repartida la pantalla antes de decidir.
+
+La ventana se ajusta de alto a lo que ocupa cada paso, y las filas entran escalonadas desde el lado hacia el
+que estés yendo.
+
+Se puede volver a abrir cuando quieras desde el menú ⫼ → **Asistente de configuración…**. Cada cambio se
+guarda en el momento, así que cerrarlo por la mitad nunca deja la config a medio hacer.
+
 ## El menú
 
 <img src="docs/menu.png" width="262" align="right" alt="Menú de Stax">
@@ -93,10 +142,14 @@ Desde el ícono ⫼ de la barra de menú:
 - **Columna 1 / 2 / 3**: la pila de ventanas de cada columna (● la frontal, ○ las de atrás), con ▶ en la
   columna activa. Elegí una ventana del submenú para traerla al frente (con ⌥ apretada, para compartirla), o
   *Mover la ventana con foco acá*.
-- **Compartir la ventana con foco** / **Dejar de compartir**: lo mismo que ⌃⌥S, y qué se está compartiendo.
+- **Compartir la ventana con foco** / **Dejar de compartir**: lo mismo que ⌃⌥S, y qué se está compartiendo
+  (por el espejo o transmitiendo en Discord).
 - **Seguir la ventana con foco**: el modo automático de Stax Share (✓ cuando está activo).
+- **Compartir por**: *Automático*, *Ventana espejo* o *Discord*, con el estado del plugin StaxBridge.
+- **Espejo en una pantalla virtual**: saca el espejo del escritorio y lo pone en un monitor virtual.
 - **Columnas**: 2, 3 o 4 columnas.
 - **Columna objetivo**: *Ventana con foco* (por defecto) o *Bajo el puntero*.
+- **Asistente de configuración…**: vuelve a abrir el asistente de cinco pasos.
 - **Abrir config.json** / **Recargar config** (⌘R): para cambiar atajos y ajustes finos.
 - **Salir de Stax** (⌘Q).
 
@@ -141,6 +194,9 @@ Desde el ícono ⫼ de la barra de menú:
     { "key": "s", "modifiers": ["control", "option", "shift"], "action": "toggleFollowFocus" }
   ],
   "shareFollowsFocus": false,
+  "shareBackend": "auto",
+  "shareUsesVirtualDisplay": false,
+  "setupCompleted": false,
   "raiseOnlyTargetWindow": true,
   "minimumWindowSize": 120,
   "verbose": false
@@ -154,7 +210,10 @@ Desde el ícono ⫼ de la barra de menú:
 - `hotkeys[].modifiers`: combinación de `command`, `option`, `control`, `shift`.
 - `hotkeys[].action`: `cycleNext`, `cyclePrev`, `focusColumnLeft`, `focusColumnRight`, `moveToColumn`
   (este último con `column`, 1-based), `shareFocusedWindow`, `stopSharing`, `toggleFollowFocus`.
-- `shareFollowsFocus`: con Stax Share abierta, el espejo sigue solo a la ventana con foco.
+- `shareFollowsFocus`: mientras se esté compartiendo, el origen sigue solo a la ventana con foco.
+- `shareBackend`: `auto`, `mirror` (siempre el espejo) o `discord` (siempre el plugin StaxBridge).
+- `shareUsesVirtualDisplay`: el espejo vive en una pantalla virtual en vez de ocupar lugar en el escritorio.
+- `setupCompleted`: si el asistente ya se mostró. Ponelo en `false` para que vuelva a aparecer al arrancar.
 - `raiseOnlyTargetWindow`: usa la API privada de SkyLight (técnica de AltTab/yabai) para subir sólo esa
   ventana. En `false` usa Accessibility puro, que trae todas las ventanas de la app.
 - `verbose`: escribe cada atajo y acción en `~/Library/Logs/Stax.log`.
@@ -191,6 +250,17 @@ build/Stax.app/Contents/MacOS/Stax screenshot-menu docs/menu.png   # captura rea
   cortar la captura.
 - `Follow.swift`: `NSWorkspace.didActivateApplicationNotification` + `AXObserver` sobre la app frontal
   (`kAXFocusedWindowChangedNotification`) para el modo automático.
+- `Bridge.swift`: socket UNIX en `~/.config/stax/bridge.sock` con JSON por líneas, para hablar con el plugin
+  StaxBridge de Vencord; Stax es el servidor y el plugin reconecta solo.
+- `VirtualDisplay.swift` + `Sources/StaxPrivate/`: la API privada `CGVirtualDisplay` de CoreGraphics (la misma
+  de DeskPad y BetterDisplay) para registrar el monitor virtual donde vive el espejo.
+- `scripts/make-demo.swift`: dibuja todas las animaciones de `docs/` con CoreGraphics, sin grabar pantalla.
+  La cantidad de columnas es un parámetro de cada demo, de ahí salen las tres del asistente.
+- `Setup.swift`: el asistente, en AppKit. Las transiciones son Core Animation sobre la capa de cada vista
+  (`CASpringAnimation` para la entrada escalonada), así el layout lo sigue manejando Auto Layout sin pelearse
+  con la animación.
+- `VencordPlugin/staxBridge/`: el plugin, en TypeScript. `native.ts` habla por el socket desde el proceso
+  principal de Discord; `index.tsx` cambia la fuente del Go Live con `setGoLiveSource` desde el renderer.
 
 ## Licencia
 
