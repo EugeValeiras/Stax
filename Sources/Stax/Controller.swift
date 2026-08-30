@@ -68,6 +68,11 @@ final class Controller {
             return
         }
 
+        if action == .fillScreen {
+            fillFocusedWindow(in: target.layout)
+            return
+        }
+
         switch action {
         case .focusColumnLeft:
             guard column > 0 else { Log.info("ya estoy en la primera columna"); return }
@@ -104,7 +109,7 @@ final class Controller {
                 }
             }
 
-        case .moveToColumn, .shareFocusedWindow, .stopSharing, .toggleFollowFocus:
+        case .moveToColumn, .fillScreen, .shareFocusedWindow, .stopSharing, .toggleFollowFocus:
             break // manejados arriba
         }
     }
@@ -206,6 +211,18 @@ final class Controller {
         if !ShareMirror.shared.isOpen, window.id == Bridge.shared.requestedWindowID { return }
         Log.info("sigo el foco → \(window.ownerName) #\(window.id)")
         share(window)
+    }
+
+    /// Agranda la ventana con foco hasta ocupar todas las columnas de su pantalla. No es el pantalla
+    /// completa nativo de macOS: no crea un espacio aparte, así que ⌘` y los demás atajos siguen andando.
+    func fillFocusedWindow(in layout: ColumnLayout) {
+        guard let window = FocusedWindow.element() else {
+            Log.warn("no hay ventana con foco para agrandar")
+            return
+        }
+        let frame = layout.fullFrame
+        let ok = AX.setFrame(frame, of: window)
+        Log.info("agrandar ventana con foco → \(Int(frame.width))×\(Int(frame.height)) \(ok ? "OK" : "falló")")
     }
 
     /// Mueve la ventana con foco a una columna (0-based) de la pantalla donde está.

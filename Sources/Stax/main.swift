@@ -5,7 +5,7 @@ import ApplicationServices
 //   Stax                 → app de barra de menú con los atajos globales
 //   Stax --verbose       → ídem, logueando atajos y acciones a stderr
 //   Stax list            → imprime las ventanas por columna y sale
-//   Stax do <acción> [N] → ejecuta cycleNext | cyclePrev | focusColumnLeft | focusColumnRight | moveToColumn
+//   Stax do <acción> [N] → ejecuta cycleNext | cyclePrev | focusColumnLeft | focusColumnRight | moveToColumn | fillScreen
 //                                 (N = columna 1-based sobre la que actuar; por defecto, la de la ventana con foco)
 //                                 shareFocusedWindow, stopSharing y toggleFollowFocus sólo funcionan desde la app de barra de menú
 //   Stax screenshot-menu <png> → abre el menú de la barra, lo captura en <png> y sale (para la documentación)
@@ -44,7 +44,7 @@ case "list":
 
 case "do":
     guard arguments.count >= 2, let action = Action(rawValue: arguments[1]) else {
-        print("Uso: Stax do cycleNext|cyclePrev|focusColumnLeft|focusColumnRight|moveToColumn [columna]")
+        print("Uso: Stax do cycleNext|cyclePrev|focusColumnLeft|focusColumnRight|moveToColumn|fillScreen [columna]")
         exit(2)
     }
     if [.shareFocusedWindow, .stopSharing, .toggleFollowFocus].contains(action) {

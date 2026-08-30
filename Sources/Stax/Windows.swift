@@ -106,6 +106,9 @@ struct ColumnLayout {
         column(containing: window.center.x)
     }
 
+    /// Toda el área visible de la pantalla (sin barra de menú ni Dock): las columnas juntas.
+    var fullFrame: CGRect { Screens.visibleFrame(of: screen) }
+
     /// Rectángulo de la columna dentro del área visible (sin barra de menú ni Dock).
     func frame(ofColumn index: Int) -> CGRect {
         let visible = Screens.visibleFrame(of: screen)

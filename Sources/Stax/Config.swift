@@ -7,6 +7,7 @@ enum Action: String, Codable {
     case focusColumnLeft    // foco a la ventana frontal de la columna de la izquierda
     case focusColumnRight   // foco a la ventana frontal de la columna de la derecha
     case moveToColumn       // mueve y redimensiona la ventana con foco a la columna `column` del atajo
+    case fillScreen         // agranda la ventana con foco a todas las columnas de su pantalla
     case shareFocusedWindow // la ventana con foco pasa a ser la que refleja la ventana "Stax Share"
     case stopSharing        // cierra la ventana "Stax Share"
     case toggleFollowFocus  // activa/desactiva que "Stax Share" siga sola a la ventana con foco
@@ -21,6 +22,7 @@ extension Action {
         case .focusColumnLeft: return "Foco al tercio de la izquierda"
         case .focusColumnRight: return "Foco al tercio de la derecha"
         case .moveToColumn: return "Mover la ventana con foco a un tercio"
+        case .fillScreen: return "Agrandar la ventana con foco a toda la pantalla"
         case .shareFocusedWindow: return "Compartir la ventana con foco"
         case .stopSharing: return "Dejar de compartir"
         case .toggleFollowFocus: return "Que lo compartido siga al foco"
@@ -90,6 +92,7 @@ struct Config: Codable {
         Hotkey(key: "d", modifiers: [.control, .option], action: .moveToColumn, column: 1),
         Hotkey(key: "f", modifiers: [.control, .option], action: .moveToColumn, column: 2),
         Hotkey(key: "g", modifiers: [.control, .option], action: .moveToColumn, column: 3),
+        Hotkey(key: "w", modifiers: [.control, .option], action: .fillScreen),
         Hotkey(key: "s", modifiers: [.control, .option], action: .shareFocusedWindow),
         Hotkey(key: "s", modifiers: [.control, .option, .shift], action: .toggleFollowFocus),
     ]
@@ -101,7 +104,9 @@ struct Config: Codable {
     static func load() -> Config {
         if let data = try? Data(contentsOf: fileURL) {
             do {
-                return try JSONDecoder().decode(Config.self, from: data)
+                var config = try JSONDecoder().decode(Config.self, from: data)
+                config.adoptNewDefaultHotkeys()
+                return config
             } catch {
                 Log.warn("config.json inválido (\(error.localizedDescription)); uso defaults")
                 return Config()
@@ -110,6 +115,22 @@ struct Config: Codable {
         let config = Config()
         config.saveIfMissing()
         return config
+    }
+
+    /// Una versión nueva de Stax puede traer acciones que tu config.json todavía no conoce. Si una acción
+    /// no tiene ningún atajo asignado y su combinación por defecto está libre, se la agregamos: de lo
+    /// contrario la función nueva quedaría muerta hasta editar el JSON a mano. Lo que ya cambiaste no se toca:
+    /// alcanza con que la acción tenga *algún* atajo para que la dejemos como está.
+    mutating func adoptNewDefaultHotkeys() {
+        let boundActions = Set(hotkeys.map(\.action))
+        let usedCombinations = Set(hotkeys.map(\.description))
+        let missing = Config.defaultHotkeys.filter {
+            !boundActions.contains($0.action) && !usedCombinations.contains($0.description)
+        }
+        guard !missing.isEmpty else { return }
+        hotkeys.append(contentsOf: missing)
+        Log.info("atajos nuevos agregados a la config: \(missing.map { "\($0.description) → \($0.actionDescription)" }.joined(separator: ", "))")
+        save()
     }
 
     func saveIfMissing() {

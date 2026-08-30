@@ -48,6 +48,12 @@ Mueve y redimensiona la ventana con foco al primer, segundo o tercer tercio, den
 de menú ni Dock). Son los mismos atajos que usa Rectangle para los tercios, así que si sólo usabas Rectangle
 para eso, Stax lo reemplaza. Si lo dejás abierto con esos atajos, desactivalos ahí para que no se pisen.
 
+### Agrandar la ventana a toda la pantalla — ⌃⌥W
+
+Estira la ventana con foco hasta ocupar **todas las columnas** de la pantalla donde está, dentro del área
+visible (sin barra de menú ni Dock). No es el pantalla completa nativo de macOS: no crea un espacio aparte,
+así que ⌘` y el resto de los atajos siguen funcionando, y ⌃⌥D/F/G la devuelven a un tercio cuando quieras.
+
 ### Cambiar la ventana que compartís en una videollamada — ⌃⌥S
 
 <img src="docs/demo-share.gif" width="960" alt="⌃⌥S hace que Stax Share refleje la ventana con foco; con «Seguir la ventana con foco» el espejo cambia solo">
@@ -113,6 +119,7 @@ Términos de Servicio de Discord; ahí están los detalles y cómo revertirlo.
 | ⌃⌥D | `moveToColumn` 1 | Mueve la ventana con foco al primer tercio |
 | ⌃⌥F | `moveToColumn` 2 | Mueve la ventana con foco al tercio del medio |
 | ⌃⌥G | `moveToColumn` 3 | Mueve la ventana con foco al último tercio |
+| ⌃⌥W | `fillScreen` | Agranda la ventana con foco a toda la pantalla |
 | ⌃⌥S | `shareFocusedWindow` | La ventana con foco pasa a ser la que refleja *Stax Share* |
 | ⌃⌥⇧S | `toggleFollowFocus` | Activa/desactiva que *Stax Share* siga sola a la ventana con foco |
 
@@ -190,6 +197,7 @@ Desde el ícono ⫼ de la barra de menú:
     { "key": "d", "modifiers": ["control", "option"], "action": "moveToColumn", "column": 1 },
     { "key": "f", "modifiers": ["control", "option"], "action": "moveToColumn", "column": 2 },
     { "key": "g", "modifiers": ["control", "option"], "action": "moveToColumn", "column": 3 },
+    { "key": "w", "modifiers": ["control", "option"], "action": "fillScreen" },
     { "key": "s", "modifiers": ["control", "option"], "action": "shareFocusedWindow" },
     { "key": "s", "modifiers": ["control", "option", "shift"], "action": "toggleFollowFocus" }
   ],
@@ -204,6 +212,9 @@ Desde el ícono ⫼ de la barra de menú:
 ```
 
 - `columnSelection`: `focused` (columna de la ventana con foco) o `pointer` (columna bajo el mouse).
+- `hotkeys`: si una versión nueva trae una acción que tu config no tiene asignada a ningún atajo, Stax le
+  agrega el atajo por defecto al arrancar (siempre que la combinación esté libre). Los que ya cambiaste
+  quedan como están.
 - `hotkeys[].key`: un carácter (`"\`"`, `"1"`), un nombre (`left`, `right`, `up`, `down`, `tab`, `space`,
   `escape`, `return`, `delete`) o `"keycode:50"`. Los caracteres se comparan sin modificadores, así ⌘⇧` sigue
   siendo "`" y no "~".
