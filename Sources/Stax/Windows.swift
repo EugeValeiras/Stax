@@ -109,11 +109,15 @@ struct ColumnLayout {
     /// Toda el área visible de la pantalla (sin barra de menú ni Dock): las columnas juntas.
     var fullFrame: CGRect { Screens.visibleFrame(of: screen) }
 
-    /// Rectángulo de la columna dentro del área visible (sin barra de menú ni Dock).
-    func frame(ofColumn index: Int) -> CGRect {
+    /// Rectángulo de `span` columnas seguidas a partir de `index`, dentro del área visible
+    /// (sin barra de menú ni Dock). Se recorta si el tramo se pasaría del borde derecho.
+    func frame(ofColumn index: Int, span: Int = 1) -> CGRect {
         let visible = Screens.visibleFrame(of: screen)
         let width = visible.width / CGFloat(max(columns, 1))
-        return CGRect(x: visible.minX + CGFloat(index) * width, y: visible.minY, width: width, height: visible.height)
+        let start = min(max(index, 0), columns - 1)
+        let count = min(max(span, 1), columns - start)
+        return CGRect(x: visible.minX + CGFloat(start) * width, y: visible.minY,
+                      width: width * CGFloat(count), height: visible.height)
     }
 }
 

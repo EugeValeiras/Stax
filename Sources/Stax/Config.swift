@@ -21,7 +21,7 @@ extension Action {
         case .cyclePrev: return "Ciclar al revés"
         case .focusColumnLeft: return "Foco al tercio de la izquierda"
         case .focusColumnRight: return "Foco al tercio de la derecha"
-        case .moveToColumn: return "Mover la ventana con foco a un tercio"
+        case .moveToColumn: return "Mover la ventana con foco a una o más columnas"
         case .fillScreen: return "Agrandar la ventana con foco a toda la pantalla"
         case .shareFocusedWindow: return "Compartir la ventana con foco"
         case .stopSharing: return "Dejar de compartir"
@@ -93,6 +93,8 @@ struct Config: Codable {
         Hotkey(key: "f", modifiers: [.control, .option], action: .moveToColumn, column: 2),
         Hotkey(key: "g", modifiers: [.control, .option], action: .moveToColumn, column: 3),
         Hotkey(key: "w", modifiers: [.control, .option], action: .fillScreen),
+        Hotkey(key: "f", with: "d", modifiers: [.control, .option], action: .moveToColumn, column: 1, span: 2),
+        Hotkey(key: "g", with: "f", modifiers: [.control, .option], action: .moveToColumn, column: 2, span: 2),
         Hotkey(key: "s", modifiers: [.control, .option], action: .shareFocusedWindow),
         Hotkey(key: "s", modifiers: [.control, .option, .shift], action: .toggleFollowFocus),
     ]
@@ -117,15 +119,15 @@ struct Config: Codable {
         return config
     }
 
-    /// Una versión nueva de Stax puede traer acciones que tu config.json todavía no conoce. Si una acción
-    /// no tiene ningún atajo asignado y su combinación por defecto está libre, se la agregamos: de lo
-    /// contrario la función nueva quedaría muerta hasta editar el JSON a mano. Lo que ya cambiaste no se toca:
-    /// alcanza con que la acción tenga *algún* atajo para que la dejemos como está.
+    /// Una versión nueva de Stax puede traer atajos que tu config.json todavía no conoce. Si ninguno de
+    /// los tuyos hace lo mismo (misma acción, columna y cantidad de columnas) y la combinación por defecto
+    /// está libre, se lo agregamos: de lo contrario la función nueva quedaría muerta hasta editar el JSON a
+    /// mano. Lo que ya cambiaste no se toca: alcanza con que algo haga eso mismo para que lo dejemos como está.
     mutating func adoptNewDefaultHotkeys() {
-        let boundActions = Set(hotkeys.map(\.action))
+        let bound = Set(hotkeys.map(\.bindingIdentity))
         let usedCombinations = Set(hotkeys.map(\.description))
         let missing = Config.defaultHotkeys.filter {
-            !boundActions.contains($0.action) && !usedCombinations.contains($0.description)
+            !bound.contains($0.bindingIdentity) && !usedCombinations.contains($0.description)
         }
         guard !missing.isEmpty else { return }
         hotkeys.append(contentsOf: missing)

@@ -46,10 +46,10 @@ final class Controller {
     // MARK: - Acciones
 
     func perform(_ hotkey: Hotkey) {
-        perform(hotkey.action, column: hotkey.column.map { $0 - 1 })
+        perform(hotkey.action, column: hotkey.column.map { $0 - 1 }, span: hotkey.columnSpan)
     }
 
-    func perform(_ action: Action, column override: Int? = nil) {
+    func perform(_ action: Action, column override: Int? = nil, span: Int = 1) {
         switch action {
         case .shareFocusedWindow: shareFocusedWindow(); return
         case .stopSharing: stopSharing(); return
@@ -64,7 +64,7 @@ final class Controller {
         var column = override ?? target.column
 
         if action == .moveToColumn {
-            moveFocusedWindow(to: column, in: target.layout)
+            moveFocusedWindow(to: column, span: span, in: target.layout)
             return
         }
 
@@ -226,14 +226,16 @@ final class Controller {
     }
 
     /// Mueve la ventana con foco a una columna (0-based) de la pantalla donde está.
-    func moveFocusedWindow(to column: Int, in layout: ColumnLayout) {
+    func moveFocusedWindow(to column: Int, span: Int = 1, in layout: ColumnLayout) {
         let column = min(max(column, 0), layout.columns - 1)
+        let span = min(max(span, 1), layout.columns - column)
         guard let window = FocusedWindow.element() else {
             Log.warn("no hay ventana con foco para mover")
             return
         }
-        let frame = layout.frame(ofColumn: column)
+        let frame = layout.frame(ofColumn: column, span: span)
         let ok = AX.setFrame(frame, of: window)
-        Log.info("mover ventana con foco → columna \(column + 1): \(Int(frame.minX)),\(Int(frame.minY)) \(Int(frame.width))×\(Int(frame.height)) \(ok ? "OK" : "falló")")
+        let target = span > 1 ? "columnas \(column + 1)-\(column + span)" : "columna \(column + 1)"
+        Log.info("mover ventana con foco → \(target): \(Int(frame.minX)),\(Int(frame.minY)) \(Int(frame.width))×\(Int(frame.height)) \(ok ? "OK" : "falló")")
     }
 }

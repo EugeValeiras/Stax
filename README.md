@@ -48,6 +48,16 @@ Mueve y redimensiona la ventana con foco al primer, segundo o tercer tercio, den
 de menú ni Dock). Son los mismos atajos que usa Rectangle para los tercios, así que si sólo usabas Rectangle
 para eso, Stax lo reemplaza. Si lo dejás abierto con esos atajos, desactivalos ahí para que no se pisen.
 
+### Ocupar dos columnas — ⌃⌥D+F y ⌃⌥F+G
+
+Manteniendo ⌃⌥, apretás **D y F juntas** para que la ventana con foco ocupe las columnas 1 y 2, o **F y G
+juntas** para las columnas 2 y 3. Sigue la misma lógica que ⌃⌥D/F/G (D=1, F=2, G=3): la tecla de la izquierda
+marca dónde arranca y la de la derecha dónde termina. Como son teclas contiguas, sale con una sola mano.
+
+No importa el orden en que las apretés, mientras la primera siga abajo cuando entra la segunda. Vas a ver que
+la ventana salta primero a una columna sola y enseguida se estira a las dos: es el atajo de una tecla que se
+dispara antes de que llegue la segunda, y se corrige solo.
+
 ### Agrandar la ventana a toda la pantalla — ⌃⌥W
 
 Estira la ventana con foco hasta ocupar **todas las columnas** de la pantalla donde está, dentro del área
@@ -119,6 +129,8 @@ Términos de Servicio de Discord; ahí están los detalles y cómo revertirlo.
 | ⌃⌥D | `moveToColumn` 1 | Mueve la ventana con foco al primer tercio |
 | ⌃⌥F | `moveToColumn` 2 | Mueve la ventana con foco al tercio del medio |
 | ⌃⌥G | `moveToColumn` 3 | Mueve la ventana con foco al último tercio |
+| ⌃⌥D+F | `moveToColumn` 1, `span` 2 | La ventana con foco ocupa las columnas 1 y 2 |
+| ⌃⌥F+G | `moveToColumn` 2, `span` 2 | La ventana con foco ocupa las columnas 2 y 3 |
 | ⌃⌥W | `fillScreen` | Agranda la ventana con foco a toda la pantalla |
 | ⌃⌥S | `shareFocusedWindow` | La ventana con foco pasa a ser la que refleja *Stax Share* |
 | ⌃⌥⇧S | `toggleFollowFocus` | Activa/desactiva que *Stax Share* siga sola a la ventana con foco |
@@ -198,6 +210,8 @@ Desde el ícono ⫼ de la barra de menú:
     { "key": "f", "modifiers": ["control", "option"], "action": "moveToColumn", "column": 2 },
     { "key": "g", "modifiers": ["control", "option"], "action": "moveToColumn", "column": 3 },
     { "key": "w", "modifiers": ["control", "option"], "action": "fillScreen" },
+    { "key": "f", "with": "d", "modifiers": ["control", "option"], "action": "moveToColumn", "column": 1, "span": 2 },
+    { "key": "g", "with": "f", "modifiers": ["control", "option"], "action": "moveToColumn", "column": 2, "span": 2 },
     { "key": "s", "modifiers": ["control", "option"], "action": "shareFocusedWindow" },
     { "key": "s", "modifiers": ["control", "option", "shift"], "action": "toggleFollowFocus" }
   ],
@@ -212,6 +226,8 @@ Desde el ícono ⫼ de la barra de menú:
 ```
 
 - `columnSelection`: `focused` (columna de la ventana con foco) o `pointer` (columna bajo el mouse).
+- `hotkeys`: `with` arma un acorde (esa otra tecla tiene que estar apretada al mismo tiempo) y `span` dice
+  cuántas columnas seguidas ocupa la ventana, contando desde `column`.
 - `hotkeys`: si una versión nueva trae una acción que tu config no tiene asignada a ningún atajo, Stax le
   agrega el atajo por defecto al arrancar (siempre que la combinación esté libre). Los que ya cambiaste
   quedan como están.

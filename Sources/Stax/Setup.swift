@@ -501,7 +501,9 @@ final class SetupWizard: NSObject, NSWindowDelegate {
         stack.addArrangedSubview(shortcutTable(controller.config.hotkeys.map { hotkey in
             var text = hotkey.action.humanDescription
             if hotkey.action == .moveToColumn, let column = hotkey.column {
-                text = "Mover la ventana con foco al tercio \(column)"
+                text = hotkey.columnSpan > 1
+                    ? "Mover la ventana con foco a las columnas \(column) y \(column + hotkey.columnSpan - 1)"
+                    : "Mover la ventana con foco al tercio \(column)"
             }
             return (hotkey.description, text)
         }))
